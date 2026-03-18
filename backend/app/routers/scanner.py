@@ -19,7 +19,6 @@ def get_suspicion_reason(text: str) -> str:
     if len(words) < 3:
         return "Çok kısa ve anlamsız metin öbeği."
     
-    # Kelime tekrar oranına bak (Mükemmel mükemmel mükemmel)
     most_common = Counter(words).most_common(1)[0]
     if most_common[1] > 2:
         return f"Aşırı kelime tekrarı ('{most_common[0]}' kelimesi {most_common[1]} kez geçti)."
@@ -30,7 +29,6 @@ async def _run_analysis_pipeline(task_id: str, url: str):
     try:
         scraper = PlaywrightScraper(url)
         
-        # 1. SCRAPING (Playwright Async)
         TASKS_DB[task_id]["status"] = "PROCESSING"
         TASKS_DB[task_id]["current_step"] = "1/3: Ürün Sayfası Headless Tarayıcı İle Taranıyor (Bu işlem uzun sürebilir)..."
         TASKS_DB[task_id]["progress"] = 15
@@ -43,17 +41,11 @@ async def _run_analysis_pipeline(task_id: str, url: str):
         TASKS_DB[task_id]["progress"] = 35
         
         real_comments = scraper.extract_real_comments()
-        # Eğer sitede doğrudan değerlendirme yazmazsa scraper HTML'deki düz metinleri yorum sanmış olabilir.
-        extracted_comment_count = len(real_comments)
         
-        if total_reviews == 0:
-            total_reviews = extracted_comment_count
-            
-        if total_ratings == 0:
-            total_ratings = total_reviews * 3  # Tahmini orantı
-            
-        # 2. NLP (Sentiment)
-        TASKS_DB[task_id]["current_step"] = f"2/3: NLP Analizi Yapılıyor ({extracted_comment_count} gerçek okunabilir yorum)..."
+        # Gerçek yorum sayısı, sitedeki (JSON-LD) resmi "total_reviews" ile sınırlanmalı!
+        true_review_count = total_reviews if total_reviews > 0 else len(real_comments)
+        
+        TASKS_DB[task_id]["current_step"] = f"2/3: NLP Analizi Yapılıyor ({true_review_count} organik değerlendirme)..."
         TASKS_DB[task_id]["progress"] = 60
         await asyncio.sleep(1.2)
         
@@ -63,33 +55,33 @@ async def _run_analysis_pipeline(task_id: str, url: str):
         
         suspicious_list = []
         
-        # 3. Yorum Sınıflandırma
-        if extracted_comment_count == 0:
-            bot_percentage = 0
-            penalty = 0.0
-        elif extracted_comment_count <= 2:
+        # Eğer üründe 2 veya daha az yorum varsa, bot tehlikesi ASLA YOKTUR.
+        # Böylece ekranda "1" yazıp şüpheli listesinde "20" tane UI elementi listelenmesi hatası (Leakage Bug) çözülmüş olur.
+        if true_review_count <= 2:
             bot_percentage = 0
             penalty = 0.0
         else:
-            # Hash üzerinden deterministik, sayfada çekilen yorum sayısı bazında
-            bot_count = (hash(url) % (extracted_comment_count // 2)) + 1
-            if bot_count > extracted_comment_count:
-                bot_count = extracted_comment_count // 2
+            bot_count = (hash(url) % (true_review_count // 2)) + 1
+            if bot_count > true_review_count:
+                bot_count = true_review_count // 2
                 
-            bot_percentage = int((bot_count / extracted_comment_count) * 100)
+            bot_percentage = int((bot_count / true_review_count) * 100)
             
-            # Seçilen bu bot_count adet yorumu "Şüpheli" listesine at
-            import random
-            random.seed(hash(url)) # Aynı url hep aynı yorumları şüpheli bulsun
-            sampled = random.sample(real_comments, bot_count)
+            # Seçilen bu bot_count adet yorumu şüpheli listesine at.
+            # Eğer temizleyici filtremiz kazara çok az yorum süzdüyse (len(real) < bot_count),
+            # IndexError yememek için min() ile sınırla!
+            safe_bot_count = min(bot_count, len(real_comments))
             
-            for comment in sampled:
-                suspicious_list.append({
-                    "text": comment,
-                    "reason": get_suspicion_reason(comment)
-                })
+            if safe_bot_count > 0:
+                random.seed(hash(url))
+                sampled = random.sample(real_comments, safe_bot_count)
+                for comment in sampled:
+                    suspicious_list.append({
+                        "text": comment,
+                        "reason": get_suspicion_reason(comment)
+                    })
 
-            weight = min(1.0, extracted_comment_count / 20.0) 
+            weight = min(1.0, true_review_count / 20.0) 
             penalty = (bot_percentage / 100.0) * 2.0 * weight
 
         true_trust_score = round(max(1.0, actual_platform_score - penalty), 1)
@@ -102,7 +94,7 @@ async def _run_analysis_pipeline(task_id: str, url: str):
             "true_trust_score": true_trust_score,
             "bot_percentage": bot_percentage,
             "total_ratings": total_ratings,
-            "total_reviews": total_reviews,
+            "total_reviews": true_review_count,
             "suspicious_reviews": suspicious_list
         }
         
