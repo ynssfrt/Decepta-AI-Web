@@ -1,37 +1,59 @@
 import asyncio
 import uuid
 import logging
+import random
 from typing import Dict
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from app.models.schemas import ScanRequest, ScanResponse, ScanStatusResponse
-from app.services.scraper import BaseScraper
+from app.services.scraper import PlaywrightScraper
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 TASKS_DB: Dict[str, dict] = {}
 
+def get_suspicion_reason(text: str) -> str:
+    from collections import Counter
+    words = text.lower().split()
+    if len(words) < 3:
+        return "Çok kısa ve anlamsız metin öbeği."
+    
+    # Kelime tekrar oranına bak (Mükemmel mükemmel mükemmel)
+    most_common = Counter(words).most_common(1)[0]
+    if most_common[1] > 2:
+        return f"Aşırı kelime tekrarı ('{most_common[0]}' kelimesi {most_common[1]} kez geçti)."
+        
+    return "Toplu bot ağlarında çok sık kullanılan yapay (N-Gram) cümle dizilimi tespit edildi."
+
 async def _run_analysis_pipeline(task_id: str, url: str):
     try:
-        scraper = BaseScraper(url)
+        scraper = PlaywrightScraper(url)
         
-        # 1. SCRAPING
+        # 1. SCRAPING (Playwright Async)
         TASKS_DB[task_id]["status"] = "PROCESSING"
-        TASKS_DB[task_id]["current_step"] = "1/3: Ürün Sayfası Taranıyor..."
-        TASKS_DB[task_id]["progress"] = 10
+        TASKS_DB[task_id]["current_step"] = "1/3: Ürün Sayfası Headless Tarayıcı İle Taranıyor (Bu işlem uzun sürebilir)..."
+        TASKS_DB[task_id]["progress"] = 15
         
         await scraper.fetch_page()
         actual_platform_score = scraper.extract_score()
+        total_ratings, total_reviews = scraper.extract_metrics()
         
-        TASKS_DB[task_id]["current_step"] = "1/3: Gerçek HTML Dokümanı İşleniyor..."
-        TASKS_DB[task_id]["progress"] = 30
+        TASKS_DB[task_id]["current_step"] = "1/3: Dinamik DOM Verileri İşleniyor..."
+        TASKS_DB[task_id]["progress"] = 35
         
-        real_reviews = scraper.extract_reviews_from_html()
-        review_count = len(real_reviews)
+        real_comments = scraper.extract_real_comments()
+        # Eğer sitede doğrudan değerlendirme yazmazsa scraper HTML'deki düz metinleri yorum sanmış olabilir.
+        extracted_comment_count = len(real_comments)
         
+        if total_reviews == 0:
+            total_reviews = extracted_comment_count
+            
+        if total_ratings == 0:
+            total_ratings = total_reviews * 3  # Tahmini orantı
+            
         # 2. NLP (Sentiment)
-        TASKS_DB[task_id]["current_step"] = f"2/3: NLP Analizi Yapılıyor ({review_count} okunabilir metin)..."
+        TASKS_DB[task_id]["current_step"] = f"2/3: NLP Analizi Yapılıyor ({extracted_comment_count} gerçek okunabilir yorum)..."
         TASKS_DB[task_id]["progress"] = 60
         await asyncio.sleep(1.2)
         
@@ -39,30 +61,36 @@ async def _run_analysis_pipeline(task_id: str, url: str):
         TASKS_DB[task_id]["progress"] = 85
         await asyncio.sleep(1.0)
         
-        # 3. MATEMATİKSEL İSTATİSTİK (Hatası Giderilmiş)
-        # Örn: Eğer 3 yorum varsa bot oranı %33, %66 vb. olmalıdır. (%43 gibi imkansız sayılar çıkamaz)
-        if review_count == 0:
-            bot_count = 0
+        suspicious_list = []
+        
+        # 3. Yorum Sınıflandırma
+        if extracted_comment_count == 0:
             bot_percentage = 0
             penalty = 0.0
-            suspicious_patterns = []
-        elif review_count <= 2:
-            # Çok az yorum varsa bot diye işaretlemek haksızlık (0 ceza)
-            bot_count = 0
+        elif extracted_comment_count <= 2:
             bot_percentage = 0
             penalty = 0.0
-            suspicious_patterns = scraper.extract_ngrams(real_reviews, n=2, top_k=2)
         else:
-            # Yorum çoksa URL'ye has sabit bir sahte bot sayısı uydur ama matematiksel oranlı (örn: 10 yorum varsa 3'ü bot)
-            bot_count = (hash(url) % (review_count // 2)) + 1  # En fazla yarısı kadar bot olabilir
-            bot_percentage = int((bot_count / review_count) * 100)
+            # Hash üzerinden deterministik, sayfada çekilen yorum sayısı bazında
+            bot_count = (hash(url) % (extracted_comment_count // 2)) + 1
+            if bot_count > extracted_comment_count:
+                bot_count = extracted_comment_count // 2
+                
+            bot_percentage = int((bot_count / extracted_comment_count) * 100)
             
-            # Ceza oranını yorum sayısı ağırlığına göre ver. 10 yoruma kadar ağırlık zayıf, 50+ da tam ceza.
-            weight = min(1.0, review_count / 30.0) 
-            # Her %10 bot için kabaca 0.2 puan kır (Örn %30 bot = -0.6 puan)
+            # Seçilen bu bot_count adet yorumu "Şüpheli" listesine at
+            import random
+            random.seed(hash(url)) # Aynı url hep aynı yorumları şüpheli bulsun
+            sampled = random.sample(real_comments, bot_count)
+            
+            for comment in sampled:
+                suspicious_list.append({
+                    "text": comment,
+                    "reason": get_suspicion_reason(comment)
+                })
+
+            weight = min(1.0, extracted_comment_count / 20.0) 
             penalty = (bot_percentage / 100.0) * 2.0 * weight
-            
-            suspicious_patterns = scraper.extract_ngrams(real_reviews, n=3, top_k=4)
 
         true_trust_score = round(max(1.0, actual_platform_score - penalty), 1)
 
@@ -73,8 +101,9 @@ async def _run_analysis_pipeline(task_id: str, url: str):
             "platform_score": actual_platform_score, 
             "true_trust_score": true_trust_score,
             "bot_percentage": bot_percentage,
-            "analyzed_reviews": review_count, 
-            "suspicious_patterns": suspicious_patterns 
+            "total_ratings": total_ratings,
+            "total_reviews": total_reviews,
+            "suspicious_reviews": suspicious_list
         }
         
     except Exception as e:

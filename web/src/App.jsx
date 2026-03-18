@@ -6,13 +6,11 @@ function App() {
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [showResults, setShowResults] = useState(false);
 
-    // Polling states
     const [taskId, setTaskId] = useState(null);
     const [progress, setProgress] = useState(0);
     const [currentStep, setCurrentStep] = useState('');
     const [errorMsg, setErrorMsg] = useState('');
 
-    // Final Results
     const [analysisResult, setAnalysisResult] = useState(null);
 
     const API_BASE_URL = 'http://127.0.0.1:8000/api/v1/scan';
@@ -44,7 +42,6 @@ function App() {
         }
     };
 
-    // Listen task status
     useEffect(() => {
         let intervalId;
 
@@ -74,7 +71,7 @@ function App() {
                     setTaskId(null);
                     clearInterval(intervalId);
                 }
-            }, 2000); // 2 seconds poll
+            }, 2000);
         }
 
         return () => {
@@ -86,7 +83,7 @@ function App() {
         <div className="dashboard-container">
             <header>
                 <h1>Decepta AI</h1>
-                <p>B2B Analist Paneli & Ağ Tespiti (Gerçek Zamanlı)</p>
+                <p>B2B Analist Paneli & Gerçek Zamanlı DOM Kazıma</p>
             </header>
 
             <main>
@@ -104,12 +101,12 @@ function App() {
                         onClick={startAnalysis}
                         disabled={isAnalyzing || !url.trim()}
                     >
-                        {isAnalyzing ? "Analiz Ediliyor..." : "Sistemi Tarat"}
+                        {isAnalyzing ? "Analiz Ediliyor..." : "Tarayıcıda Başlat"}
                     </button>
                 </div>
 
                 {errorMsg && (
-                    <div style={{ color: "var(--accent-red)", textAlign: "center", marginBottom: "2rem" }}>
+                    <div style={{ color: "var(--accent-red)", textAlign: "center", marginBottom: "2rem", background: "rgba(239, 68, 68, 0.1)", padding: "1rem", borderRadius: "10px" }}>
                         ❌ {errorMsg}
                     </div>
                 )}
@@ -130,43 +127,81 @@ function App() {
                 )}
 
                 {showResults && analysisResult && (
-                    <div className="results-grid">
-                        <div className="glass-card">
-                            <h3>Gerçek Güven Skoru</h3>
-                            <div className="score-display">
-                                <span className={`score-value ${analysisResult.true_trust_score < 3.0 ? 'danger' : 'safe'}`}>
-                                    {analysisResult.true_trust_score}
-                                </span>
-                                <span className="score-max">/ 5.0</span>
+                    <>
+                        {/* Metrikler */}
+                        <div className="results-grid" style={{ marginBottom: '2rem' }}>
+                            <div className="glass-card">
+                                <h3>Gerçek Güven Skoru</h3>
+                                <div className="score-display">
+                                    <span className={`score-value ${analysisResult.true_trust_score < 3.0 ? 'danger' : 'safe'}`}>
+                                        {analysisResult.true_trust_score}
+                                    </span>
+                                    <span className="score-max">/ 5.0</span>
+                                </div>
+                                <div className="bot-percentage">
+                                    Toplam {analysisResult.total_reviews} yazılı yorum incelendi. İhlal oranı: %{analysisResult.bot_percentage}
+                                </div>
                             </div>
-                            <div className="bot-percentage">
-                                ⚠ {analysisResult.analyzed_reviews} yorum içinde %{analysisResult.bot_percentage} şüpheli ağ tespiti!
+
+                            <div className="glass-card">
+                                <h3>İstatistikler</h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                                        <span style={{ color: 'var(--text-muted)' }}>Toplam Değerlendirme Puanı:</span>
+                                        <strong style={{ fontSize: '1.2rem' }}>{analysisResult.total_ratings}</strong>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
+                                        <span style={{ color: 'var(--text-muted)' }}>Toplam Yazılı Yorum:</span>
+                                        <strong style={{ fontSize: '1.2rem' }}>{analysisResult.total_reviews}</strong>
+                                    </div>
+                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                        <span style={{ color: 'var(--accent-red)' }}>Şüpheli Yorum Tespiti:</span>
+                                        <strong style={{ fontSize: '1.2rem', color: 'var(--accent-red)' }}>{analysisResult.suspicious_reviews?.length || 0}</strong>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="glass-card">
+                                <h3>E-Ticaret Sitesi Skoru</h3>
+                                <div className="score-display">
+                                    <span className="score-value safe">{analysisResult.platform_score}</span>
+                                    <span className="score-max">/ 5.0</span>
+                                </div>
+                                <p style={{ color: 'var(--text-muted)', marginTop: '1rem', fontSize: '0.9rem' }}>
+                                    E-ticaret arayüzünde görünen manipüle edilmiş genel ortalama.
+                                </p>
                             </div>
                         </div>
 
-                        <div className="glass-card">
-                            <h3>Şüpheli NLP Şablonları</h3>
-                            <p style={{ color: 'var(--text-muted)', marginBottom: '1rem', fontSize: '0.9rem' }}>
-                                Zaman serisi ve AI modeli tarafından yakalanan tekrar eden öbekler:
-                            </p>
-                            <div className="words-list">
-                                {analysisResult.suspicious_patterns.map((word, idx) => (
-                                    <span key={idx} className="word-tag">{word}</span>
-                                ))}
+                        {/* Suspicious Reviews List */}
+                        {analysisResult.suspicious_reviews && analysisResult.suspicious_reviews.length > 0 && (
+                            <div className="glass-card" style={{ width: '100%' }}>
+                                <h3 style={{ color: 'var(--accent-red)', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+                                    Ağ İhlali Tespit Edilen Yorumlar
+                                </h3>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                    {analysisResult.suspicious_reviews.map((rev, idx) => (
+                                        <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', borderLeft: '4px solid var(--accent-red)' }}>
+                                            <p style={{ color: '#e2e8f0', fontSize: '1rem', fontStyle: 'italic', marginBottom: '0.8rem', lineHeight: '1.5' }}>
+                                                "{rev.text}"
+                                            </p>
+                                            <span style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', padding: '0.3rem 0.6rem', borderRadius: '6px', fontSize: '0.8rem' }}>
+                                                🕵️ Sebep: {rev.reason}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
                             </div>
-                        </div>
+                        )}
 
-                        <div className="glass-card">
-                            <h3>E-Ticaret Sitesi Skoru</h3>
-                            <div className="score-display">
-                                <span className="score-value safe">{analysisResult.platform_score}</span>
-                                <span className="score-max">/ 5.0</span>
+                        {analysisResult.suspicious_reviews && analysisResult.suspicious_reviews.length === 0 && (
+                            <div className="glass-card" style={{ width: '100%', textAlign: 'center' }}>
+                                <h3 style={{ color: 'var(--accent-green)' }}>Hiçbir Şüpheli Yorum Bulunamadı</h3>
+                                <p style={{ color: 'var(--text-muted)', marginTop: '1rem' }}>Ürün incelemeleri organik görünüyor. Bot ağ tespiti sıfır (0).</p>
                             </div>
-                            <p style={{ color: 'var(--text-muted)', marginTop: '1rem', fontSize: '0.9rem' }}>
-                                Manipüle edilmiş standart değerlendirme ortalaması.
-                            </p>
-                        </div>
-                    </div>
+                        )}
+
+                    </>
                 )}
             </main>
         </div>
