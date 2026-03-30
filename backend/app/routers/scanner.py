@@ -65,12 +65,8 @@ async def _run_analysis_pipeline(task_id: str, url: str):
             if bot_count > true_review_count:
                 bot_count = true_review_count // 2
                 
-            bot_percentage = int((bot_count / true_review_count) * 100)
-            
-            # Seçilen bu bot_count adet yorumu şüpheli listesine at.
-            # Eğer temizleyici filtremiz kazara çok az yorum süzdüyse (len(real) < bot_count),
-            # IndexError yememek için min() ile sınırla!
             safe_bot_count = min(bot_count, len(real_comments))
+            bot_percentage = int((safe_bot_count / true_review_count) * 100)
             
             if safe_bot_count > 0:
                 random.seed(hash(url))

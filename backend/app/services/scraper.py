@@ -161,7 +161,7 @@ class PlaywrightScraper:
             import random
             random.seed(h)
             
-            return random.sample(bases * 3, count)
+            return list(set(random.sample(bases * 3, count)))
 
         if not self.soup: return []
             
