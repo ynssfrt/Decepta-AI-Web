@@ -59,7 +59,7 @@ async def _run_analysis_pipeline(task_id: str, url: str):
         # Böylece ekranda "1" yazıp şüpheli listesinde "20" tane UI elementi listelenmesi hatası (Leakage Bug) çözülmüş olur.
         if true_review_count <= 2:
             bot_percentage = 0
-            penalty = 0.0
+            true_trust_score = actual_platform_score
         else:
             bot_count = (hash(url) % (true_review_count // 2)) + 1
             if bot_count > true_review_count:
@@ -77,10 +77,20 @@ async def _run_analysis_pipeline(task_id: str, url: str):
                         "reason": get_suspicion_reason(comment)
                     })
 
-            weight = min(1.0, true_review_count / 20.0) 
-            penalty = (bot_percentage / 100.0) * 2.0 * weight
-
-        true_trust_score = round(max(1.0, actual_platform_score - penalty), 1)
+            # GERÇEK GÜVEN SKORU MATEMATİĞİ (Bot etkisini çıkarma)
+            num_ratings = total_ratings if total_ratings > 0 else true_review_count
+            suspected_bot_ratings = int(num_ratings * (bot_percentage / 100.0))
+            organic_ratings_count = max(0, num_ratings - suspected_bot_ratings)
+            
+            if organic_ratings_count <= 0 or num_ratings == 0:
+                true_trust_score = actual_platform_score
+            else:
+                total_points = num_ratings * actual_platform_score
+                bot_vote_value = 5.0 if actual_platform_score >= 3.0 else 1.0
+                bot_points = suspected_bot_ratings * bot_vote_value
+                organic_points = max(0, total_points - bot_points)
+                calculated_score = organic_points / organic_ratings_count
+                true_trust_score = round(max(1.0, min(5.0, calculated_score)), 1)
 
         TASKS_DB[task_id]["status"] = "COMPLETED"
         TASKS_DB[task_id]["progress"] = 100
