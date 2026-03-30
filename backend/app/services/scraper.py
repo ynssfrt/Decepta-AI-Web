@@ -46,24 +46,25 @@ class PlaywrightScraper:
                 self.soup = BeautifulSoup(self.html_content, "html.parser")
                 
                 # Check for WAF blocks (Cloudflare / DataDome)
-                if len(self.html_content) < 15000 or "robot" in self.html_content.lower() or "güvenlik" in self.text_content.lower():
-                    import requests
+                is_waf = len(self.html_content) < 15000 or "cloudflare" in self.html_content.lower() or "robot musunuz" in self.text_content.lower()
+                if is_waf:
+                    from curl_cffi.requests import AsyncSession
                     try:
-                        logger.info("WAF tespiti! Googlebot User-Agent ile requests fallback başlatılıyor.")
-                        headers = {"User-Agent": "Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)"}
-                        resp = requests.get(self.url, headers=headers, timeout=10)
+                        logger.info("WAF tespiti! curl_cffi ile Chrome impersonate edilerek fallback başlatılıyor.")
+                        async with AsyncSession() as session:
+                            resp = await session.get(self.url, impersonate="chrome110", timeout=15)
                         if resp.status_code == 200 and len(resp.text) > 15000:
                             self.html_content = resp.text
                             self.soup = BeautifulSoup(self.html_content, "html.parser")
                             self.text_content = getattr(self.soup, 'text', '')
                             self.is_waf_blocked = False
-                            logger.info("Requests fallback başarılı! WAF aşıldı.")
+                            logger.info("curl_cffi fallback başarılı! WAF aşıldı.")
                         else:
                             self.is_waf_blocked = True
-                            logger.warning("Scraper requests fallback başarısız! Fallback modüle geçiliyor.")
+                            logger.warning(f"curl_cffi fallback başarısız! Durum: {resp.status_code}. Fallback modüle geçiliyor.")
                     except Exception as ex:
                         self.is_waf_blocked = True
-                        logger.error(f"Requests fallback hatası: {str(ex)}")
+                        logger.error(f"curl_cffi fallback hatası: {str(ex)}")
                 
                 await browser.close()
         except Exception as e:
