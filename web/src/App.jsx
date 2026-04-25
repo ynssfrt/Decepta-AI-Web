@@ -146,17 +146,17 @@ function App() {
                             <div className="glass-card">
                                 <h3>İstatistikler</h3>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                                        <span style={{ color: 'var(--text-muted)' }}>Toplam Değerlendirme Puanı:</span>
-                                        <strong style={{ fontSize: '1.2rem' }}>{analysisResult.total_ratings}</strong>
+                                    <div className="stat-row">
+                                        <span className="stat-label">Toplam Değerlendirme Puanı:</span>
+                                        <strong className="stat-val">{analysisResult.total_ratings}</strong>
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border-color)', paddingBottom: '0.5rem' }}>
-                                        <span style={{ color: 'var(--text-muted)' }}>Toplam Yazılı Yorum:</span>
-                                        <strong style={{ fontSize: '1.2rem' }}>{analysisResult.total_reviews}</strong>
+                                    <div className="stat-row">
+                                        <span className="stat-label">Toplam Yazılı Yorum:</span>
+                                        <strong className="stat-val">{analysisResult.total_reviews}</strong>
                                     </div>
-                                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                                        <span style={{ color: 'var(--accent-red)' }}>Şüpheli Yorum Tespiti:</span>
-                                        <strong style={{ fontSize: '1.2rem', color: 'var(--accent-red)' }}>{analysisResult.suspicious_reviews?.length || 0}</strong>
+                                    <div className="stat-row">
+                                        <span className="stat-label" style={{ color: 'var(--accent-red)' }}>Şüpheli Yorum Tespiti:</span>
+                                        <strong className="stat-val" style={{ color: 'var(--accent-red)' }}>{analysisResult.suspicious_reviews?.length || 0}</strong>
                                     </div>
                                 </div>
                             </div>
@@ -181,11 +181,11 @@ function App() {
                                 </h3>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                                     {analysisResult.suspicious_reviews.map((rev, idx) => (
-                                        <div key={idx} style={{ background: 'rgba(255,255,255,0.03)', padding: '1rem', borderRadius: '12px', borderLeft: '4px solid var(--accent-red)' }}>
-                                            <p style={{ color: '#e2e8f0', fontSize: '1rem', fontStyle: 'italic', marginBottom: '0.8rem', lineHeight: '1.5' }}>
+                                        <div key={idx} className="review-item">
+                                            <p className="review-text">
                                                 "{rev.text}"
                                             </p>
-                                            <span style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#fca5a5', padding: '0.3rem 0.6rem', borderRadius: '6px', fontSize: '0.8rem' }}>
+                                            <span className="review-reason">
                                                 🕵️ Sebep: {rev.reason}
                                             </span>
                                         </div>
