@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Decepta AI</h2>
+            <p>Node Aktif</p>
+        </div>
+        
+        <div class="main-content">
+            <p id="status-text">Geçerli sayfadaki ürün yorumlarını çekmek için aşağıdaki butona tıklayın.</p>
+            
+            <button id="scan-btn">
+                <span class="btn-text">Bu Sayfayı Tara</span>
+            </button>
+            
+            <div id="loading" class="hidden">
+                <div class="spinner"></div>
+                <p>Veriler Backend'e Aktarılıyor...</p>
+            </div>
+            
+            <div id="success" class="hidden">
+                ✅ Başarılı! Web panele dönün.
+            </div>
+            <div id="error" class="hidden error-text">
+                ❌ Hata oluştu.
+            </div>
+        </div>
+    </div>
+    <script src="popup.js"></script>
+</body>
+</html>

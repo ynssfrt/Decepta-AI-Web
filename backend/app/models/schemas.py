@@ -4,6 +4,8 @@ from typing import Optional, List, Dict, Any
 class ScanRequest(BaseModel):
     url: HttpUrl
     platform: Optional[str] = None 
+    html_content: Optional[str] = None
+    text_content: Optional[str] = None
 
 class ScanResponse(BaseModel):
     task_id: str

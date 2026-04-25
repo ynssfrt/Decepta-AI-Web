@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 TASKS_DB: Dict[str, dict] = {}
 
-async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer):
+async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer, html_content: str = None, text_content: str = None):
     try:
         scraper = PlaywrightScraper(url)
         
@@ -21,7 +21,15 @@ async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer):
         TASKS_DB[task_id]["current_step"] = "1/3: Ürün Sayfası Headless Tarayıcı İle Taranıyor (Bu işlem uzun sürebilir)..."
         TASKS_DB[task_id]["progress"] = 15
         
-        await scraper.fetch_page()
+        if html_content and text_content:
+            scraper.html_content = html_content
+            scraper.text_content = text_content
+            from bs4 import BeautifulSoup
+            scraper.soup = BeautifulSoup(html_content, "html.parser")
+            scraper.is_waf_blocked = False
+            TASKS_DB[task_id]["current_step"] = "1/3: Extension üzerinden gelen raw DOM işleniyor..."
+        else:
+            await scraper.fetch_page()
         actual_platform_score = scraper.extract_score()
         total_ratings, total_reviews = scraper.extract_metrics()
         
@@ -130,7 +138,14 @@ async def start_scan(request_data: ScanRequest, background_tasks: BackgroundTask
         "result": None,
         "error_message": None
     }
-    background_tasks.add_task(_run_analysis_pipeline, task_id, str(request_data.url), sentiment_analyzer)
+    background_tasks.add_task(
+        _run_analysis_pipeline, 
+        task_id, 
+        str(request_data.url), 
+        sentiment_analyzer,
+        request_data.html_content,
+        request_data.text_content
+    )
     return ScanResponse(task_id=task_id, message="Sıraya alındı.")
 
 @router.get("/{task_id}", response_model=ScanStatusResponse)
