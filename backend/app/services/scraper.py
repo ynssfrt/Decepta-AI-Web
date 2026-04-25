@@ -52,7 +52,11 @@ class PlaywrightScraper:
                     try:
                         logger.info("WAF tespiti! curl_cffi ile Chrome impersonate edilerek fallback başlatılıyor.")
                         async with AsyncSession() as session:
-                            resp = await session.get(self.url, impersonate="chrome110", timeout=15)
+                            headers = {
+                                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                                "Accept-Language": "tr-TR,tr;q=0.8,en-US;q=0.5,en;q=0.3",
+                            }
+                            resp = await session.get(self.url, impersonate="chrome116", headers=headers, timeout=15)
                         if resp.status_code == 200 and len(resp.text) > 15000:
                             self.html_content = resp.text
                             self.soup = BeautifulSoup(self.html_content, "html.parser")
@@ -70,6 +74,15 @@ class PlaywrightScraper:
         except Exception as e:
             logger.error(f"Playwright Hatası: {str(e)}")
             self.is_waf_blocked = True
+
+        # Final Validation to ensure we didn't get a dummy page
+        if not self.is_waf_blocked:
+            score, rev_c, rat_c = self._extract_from_jsonld()
+            if not rat_c or rat_c == 0:
+                trendyol_score = self.soup.find(class_='pr-in-rnr-v') if self.soup else None
+                if not trendyol_score:
+                    logger.warning("Sayfa yüklendi ancak ürün verisi (rating) bulunamadı. WAF/Dummy Page varsayılıyor.")
+                    self.is_waf_blocked = True
 
     def _extract_from_jsonld(self):
         if not self.soup: return None, None, None
