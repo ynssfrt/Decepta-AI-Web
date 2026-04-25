@@ -43,6 +43,16 @@ function App() {
     };
 
     useEffect(() => {
+        // Extension üzerinden gelen task_id'yi yakala
+        const params = new URLSearchParams(window.location.search);
+        const urlTaskId = params.get('taskId');
+        
+        if (urlTaskId && !taskId) {
+            setTaskId(urlTaskId);
+            setIsAnalyzing(true);
+            setCurrentStep('Veriler işleniyor...');
+        }
+
         let intervalId;
 
         if (taskId && isAnalyzing) {

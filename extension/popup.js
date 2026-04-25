@@ -47,8 +47,8 @@ document.getElementById('scan-btn').addEventListener('click', async () => {
         loading.classList.add('hidden');
         success.classList.remove('hidden');
         
-        // Pass the task ID back to the main Web App using a custom event or let the user open the Web App
-        // For MVP, we just show success.
+        // Sonuçları göstermek için Web Dashboard'u yeni sekmede aç
+        chrome.tabs.create({ url: `http://localhost:5173/?taskId=${data.task_id}` });
         
     } catch (err) {
         loading.classList.add('hidden');
