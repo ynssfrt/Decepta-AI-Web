@@ -14,3 +14,8 @@ requests==2.31.0
 beautifulsoup4==4.12.3
 playwright
 curl_cffi
+
+# AI & NLP
+transformers==4.38.1
+torch==2.2.1
+scikit-learn==1.4.1.post1

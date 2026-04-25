@@ -3,7 +3,7 @@ import uuid
 import logging
 import random
 from typing import Dict
-from fastapi import APIRouter, BackgroundTasks, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
 from app.models.schemas import ScanRequest, ScanResponse, ScanStatusResponse
 from app.services.scraper import PlaywrightScraper
@@ -13,19 +13,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 TASKS_DB: Dict[str, dict] = {}
 
-def get_suspicion_reason(text: str) -> str:
-    from collections import Counter
-    words = text.lower().split()
-    if len(words) < 3:
-        return "Çok kısa ve anlamsız metin öbeği."
-    
-    most_common = Counter(words).most_common(1)[0]
-    if most_common[1] > 2:
-        return f"Aşırı kelime tekrarı ('{most_common[0]}' kelimesi {most_common[1]} kez geçti)."
-        
-    return "Toplu bot ağlarında çok sık kullanılan yapay (N-Gram) cümle dizilimi tespit edildi."
-
-async def _run_analysis_pipeline(task_id: str, url: str):
+async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer):
     try:
         scraper = PlaywrightScraper(url)
         
@@ -47,36 +35,54 @@ async def _run_analysis_pipeline(task_id: str, url: str):
         
         TASKS_DB[task_id]["current_step"] = f"2/3: NLP Analizi Yapılıyor ({true_review_count} organik değerlendirme)..."
         TASKS_DB[task_id]["progress"] = 60
-        await asyncio.sleep(1.2)
         
-        TASKS_DB[task_id]["current_step"] = "3/3: Ürüne Özgü Yapay Zeka Ağ Botlarını Arıyor..."
-        TASKS_DB[task_id]["progress"] = 85
-        await asyncio.sleep(1.0)
+        from ai.src.preprocessing.text_cleaner import clean_text, calculate_text_complexity
+        from collections import Counter
         
         suspicious_list = []
         
         # Eğer üründe 2 veya daha az yorum varsa, bot tehlikesi ASLA YOKTUR.
-        # Böylece ekranda "1" yazıp şüpheli listesinde "20" tane UI elementi listelenmesi hatası (Leakage Bug) çözülmüş olur.
         if true_review_count <= 2:
             bot_percentage = 0
             true_trust_score = actual_platform_score
         else:
-            bot_count = (hash(url) % (true_review_count // 2)) + 1
-            if bot_count > true_review_count:
-                bot_count = true_review_count // 2
+            # GERÇEK AI NLP ANALİZİ
+            for comment in real_comments:
+                cleaned = clean_text(comment)
+                if not cleaned: continue
                 
-            safe_bot_count = min(bot_count, len(real_comments))
-            bot_percentage = int((safe_bot_count / true_review_count) * 100)
-            
-            if safe_bot_count > 0:
-                random.seed(hash(url))
-                sampled = random.sample(real_comments, safe_bot_count)
-                for comment in sampled:
+                complexity = calculate_text_complexity(comment)
+                sentiment_result = sentiment_analyzer.analyze(cleaned)
+                
+                is_suspicious = False
+                reasons = []
+                
+                # Aşırı tekrarlı/anlamsız karakter ve aşırı pozitiflik bot belirtisidir
+                if complexity["avg_word_length"] > 15:
+                    is_suspicious = True
+                    reasons.append("Anlamsız ve aşırı uzun harf dizilimi içeriyor")
+                
+                if complexity["word_count"] < 3 and sentiment_result["label"] == "POSITIVE" and sentiment_result["score"] > 0.95:
+                    is_suspicious = True
+                    reasons.append("Aşırı kısa ama kesin pozitif (Spam bot paterni)")
+                
+                words = cleaned.split()
+                if len(words) > 0:
+                    most_common = Counter(words).most_common(1)[0]
+                    if most_common[1] > 3 and sentiment_result["label"] == "POSITIVE":
+                        is_suspicious = True
+                        reasons.append(f"Aşırı kelime tekrarı ('{most_common[0]}' kelimesi {most_common[1]} kez geçti)")
+                
+                # Sadece pozitif olan ve şüpheli olanları listeye al
+                if is_suspicious and sentiment_result["label"] == "POSITIVE":
                     suspicious_list.append({
                         "text": comment,
-                        "reason": get_suspicion_reason(comment)
+                        "reason": " ve ".join(reasons) + f" (AI Güveni: {round(sentiment_result['score']*100)}%)"
                     })
 
+            safe_bot_count = len(suspicious_list)
+            bot_percentage = int((safe_bot_count / max(1, len(real_comments))) * 100)
+            
             # GERÇEK GÜVEN SKORU MATEMATİĞİ (Bot etkisini çıkarma)
             num_ratings = total_ratings if total_ratings > 0 else true_review_count
             suspected_bot_ratings = int(num_ratings * (bot_percentage / 100.0))
@@ -91,6 +97,10 @@ async def _run_analysis_pipeline(task_id: str, url: str):
                 organic_points = max(0, total_points - bot_points)
                 calculated_score = organic_points / organic_ratings_count
                 true_trust_score = round(max(1.0, min(5.0, calculated_score)), 1)
+
+        TASKS_DB[task_id]["current_step"] = "3/3: Ağ Analizi Tamamlanıyor..."
+        TASKS_DB[task_id]["progress"] = 85
+        await asyncio.sleep(1.0)
 
         TASKS_DB[task_id]["status"] = "COMPLETED"
         TASKS_DB[task_id]["progress"] = 100
@@ -110,7 +120,8 @@ async def _run_analysis_pipeline(task_id: str, url: str):
         TASKS_DB[task_id]["error_message"] = str(e)
 
 @router.post("/", response_model=ScanResponse)
-async def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
+async def start_scan(request_data: ScanRequest, background_tasks: BackgroundTasks, request: Request):
+    sentiment_analyzer = request.app.state.sentiment_analyzer
     task_id = str(uuid.uuid4())
     TASKS_DB[task_id] = {
         "status": "QUEUED",
@@ -119,7 +130,7 @@ async def start_scan(request: ScanRequest, background_tasks: BackgroundTasks):
         "result": None,
         "error_message": None
     }
-    background_tasks.add_task(_run_analysis_pipeline, task_id, str(request.url))
+    background_tasks.add_task(_run_analysis_pipeline, task_id, str(request_data.url), sentiment_analyzer)
     return ScanResponse(task_id=task_id, message="Sıraya alındı.")
 
 @router.get("/{task_id}", response_model=ScanStatusResponse)
