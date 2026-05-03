@@ -6,6 +6,7 @@ class ScanRequest(BaseModel):
     platform: Optional[str] = None 
     html_content: Optional[str] = None
     text_content: Optional[str] = None
+    extracted_data: Optional[Dict[str, Any]] = None
 
 class ScanResponse(BaseModel):
     task_id: str

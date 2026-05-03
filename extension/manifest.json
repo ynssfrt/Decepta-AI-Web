@@ -1,13 +1,16 @@
 {
   "manifest_version": 3,
   "name": "Decepta AI - Web Scraper Node",
-  "version": "1.0",
+  "version": "1.2",
   "description": "Decepta AI e-ticaret bot tespiti için yerel DOM kazıyıcı eklenti.",
   "permissions": [
     "activeTab",
-    "scripting"
+    "scripting",
+    "tabs"
   ],
   "host_permissions": [
+    "https://*.trendyol.com/*",
+    "https://*.hepsiburada.com/*",
     "http://127.0.0.1:8000/*",
     "http://localhost:8000/*"
   ],

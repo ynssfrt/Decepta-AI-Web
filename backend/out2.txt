@@ -1,0 +1,12 @@
+﻿
+--- Testing URL: https://www.hepsiburada.com/midex-plx-140-gitar-amfisi-ve-kulaklikli-tam-profesyonel-elektro-gitar-seti-p-HBCV00000OWCQQ ---
+Status: 200
+WAF Blocked or empty page!
+Content length: 3562344
+Failed: 'charmap' codec can't encode character '\U0001f455' in position 21: character maps to <undefined>
+
+--- Testing URL: https://www.trendyol.com/apple/iphone-13-128gb-yildiz-isigi-cep-telefonu-p-151061937 ---
+Status: 404
+WAF Blocked or empty page!
+Content length: 348896
+Title: Apple Iphone 13 128gb Yildiz Isigi Cep Telefonu Fiyat², Yorumlar² - Trendyol

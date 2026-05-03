@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react'
 import './App.css'
 
 function App() {
-    const [url, setUrl] = useState('');
     const [isAnalyzing, setIsAnalyzing] = useState(false);
     const [showResults, setShowResults] = useState(false);
 
@@ -14,33 +13,6 @@ function App() {
     const [analysisResult, setAnalysisResult] = useState(null);
 
     const API_BASE_URL = 'http://127.0.0.1:8000/api/v1/scan';
-
-    const startAnalysis = async () => {
-        if (!url.trim()) return;
-
-        setIsAnalyzing(true);
-        setShowResults(false);
-        setProgress(0);
-        setCurrentStep('Backend bağlantısı kuruluyor...');
-        setErrorMsg('');
-        setAnalysisResult(null);
-
-        try {
-            const response = await fetch(API_BASE_URL, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ url: url.trim() })
-            });
-
-            if (!response.ok) throw new Error("API'ye bağlanılamadı.");
-
-            const data = await response.json();
-            setTaskId(data.task_id);
-        } catch (err) {
-            setErrorMsg(err.message || 'Bir hata oluştu.');
-            setIsAnalyzing(false);
-        }
-    };
 
     useEffect(() => {
         // Extension üzerinden gelen task_id'yi yakala
@@ -97,23 +69,35 @@ function App() {
             </header>
 
             <main>
-                <div className="search-container">
-                    <input
-                        type="text"
-                        className="search-input"
-                        placeholder="Analiz edilecek ürün URL'sini yapıştırın (örn: trendyol.com/...)"
-                        value={url}
-                        onChange={(e) => setUrl(e.target.value)}
-                        disabled={isAnalyzing}
-                    />
-                    <button
-                        className="search-button"
-                        onClick={startAnalysis}
-                        disabled={isAnalyzing || !url.trim()}
-                    >
-                        {isAnalyzing ? "Analiz Ediliyor..." : "Tarayıcıda Başlat"}
-                    </button>
-                </div>
+                {!isAnalyzing && !showResults && (
+                    <div className="waiting-container">
+                        <div className="radar-wrapper">
+                            <div className="radar-ring"></div>
+                            <div className="radar-ring"></div>
+                            <div className="radar-ring"></div>
+                            <div className="radar-core">📡</div>
+                        </div>
+                        <div className="waiting-text">
+                            <h2>Sistem Hazır</h2>
+                            <p>Tarayıcı eklentisinden analiz verisi bekleniyor. Lütfen Trendyol veya Hepsiburada üzerinde bir ürün sayfasına gidip eklentiyi çalıştırın.</p>
+                        </div>
+                        
+                        <div className="status-cards">
+                            <div className="status-card">
+                                <div className="val">24.5K</div>
+                                <div className="lbl">Bugün İncelenen Yorum</div>
+                            </div>
+                            <div className="status-card">
+                                <div className="val">1,240</div>
+                                <div className="lbl">Yakalanan Bot</div>
+                            </div>
+                            <div className="status-card">
+                                <div className="val">%99.8</div>
+                                <div className="lbl">Sistem Uptime</div>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {errorMsg && (
                     <div style={{ color: "var(--accent-red)", textAlign: "center", marginBottom: "2rem", background: "rgba(239, 68, 68, 0.1)", padding: "1rem", borderRadius: "10px" }}>
