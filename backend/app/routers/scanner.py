@@ -7,6 +7,9 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 
 from app.models.schemas import ScanRequest, ScanResponse, ScanStatusResponse
 from app.services.scraper import PlaywrightScraper
+from app.services.image_analyzer import ImageAnalyzer
+from app.database import SessionLocal
+from app.models import scan_db
 
 logger = logging.getLogger(__name__)
 
@@ -20,12 +23,14 @@ async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer, htm
         TASKS_DB[task_id]["progress"] = 15
 
         # ---- VERİ KAYNAĞI SEÇİMİ ----
+        detailed_reviews = []
         if extracted_data:
             # Extension veri gönderdi - DOĞRUDAN kullan, scraper'a DÜŞME
             actual_platform_score = float(extracted_data.get("score", 0)) or 4.5
             total_ratings = int(extracted_data.get("total_ratings", 0))
             total_reviews = int(extracted_data.get("total_reviews", 0))
             real_comments = extracted_data.get("comments", [])
+            detailed_reviews = extracted_data.get("detailed_reviews", [])
                 
             logger.info(f"[EXT] Score={actual_platform_score}, Ratings={total_ratings}, Reviews={total_reviews}, Comments={len(real_comments)}")
             TASKS_DB[task_id]["current_step"] = "1/3: Extension verileri alındı..."
@@ -63,6 +68,26 @@ async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer, htm
         from collections import Counter
         
         suspicious_list = []
+        
+        # Resim Analizi Modülü (Computer Vision)
+        TASKS_DB[task_id]["current_step"] = "2/3: Görüntü Analizi Yapılıyor..."
+        TASKS_DB[task_id]["progress"] = 55
+        
+        photo_reviews_count = 0
+        # Öncelik: Extension'dan doğrudan gelen photo_reviews_count
+        if extracted_data and extracted_data.get("photo_reviews_count"):
+            photo_reviews_count = int(extracted_data.get("photo_reviews_count", 0))
+        # Fallback: detailed_reviews içinden say
+        elif detailed_reviews:
+            photo_reviews_count = sum(1 for r in detailed_reviews if r.get("images"))
+        
+        if detailed_reviews:
+            image_analyzer = ImageAnalyzer()
+            img_suspicious = image_analyzer.analyze_images(detailed_reviews)
+            suspicious_list.extend(img_suspicious)
+            
+        TASKS_DB[task_id]["current_step"] = f"2/3: NLP Analizi Yapılıyor ({len(real_comments)} organik değerlendirme)..."
+        TASKS_DB[task_id]["progress"] = 65
         
         if true_review_count <= 2:
             bot_percentage = 0
@@ -129,8 +154,38 @@ async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer, htm
             "bot_percentage": bot_percentage,
             "total_ratings": total_ratings,
             "total_reviews": true_review_count,
+            "photo_reviews_count": photo_reviews_count,
             "suspicious_reviews": suspicious_list
         }
+
+        # ---- VERİTABANINA KAYDET (Mobil Senkronizasyon İçin) ----
+        try:
+            db = SessionLocal()
+            new_scan = scan_db.Scan(
+                id=task_id,
+                url=url,
+                platform_score=actual_platform_score,
+                true_trust_score=true_trust_score,
+                bot_percentage=bot_percentage,
+                total_ratings=total_ratings,
+                total_reviews=true_review_count,
+                photo_reviews_count=photo_reviews_count
+            )
+            db.add(new_scan)
+            
+            for sus in suspicious_list:
+                db.add(scan_db.SuspiciousReview(
+                    scan_id=task_id,
+                    text=sus.get("text", ""),
+                    reason=sus.get("reason", "")
+                ))
+            
+            db.commit()
+            db.close()
+            logger.info(f"Veritabanına başarıyla kaydedildi: {task_id}")
+        except Exception as db_err:
+            logger.error(f"Veritabanı kayıt hatası: {db_err}")
+
         
     except Exception as e:
         logger.error(f"Pipeline Hatası: {str(e)}", exc_info=True)

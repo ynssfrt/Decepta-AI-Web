@@ -8,8 +8,13 @@ import logging
 # Add ai package to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../")))
 
-from app.routers import scanner
+from app.routers import scanner, history
 from ai.src.sentiment.analyzer import SentimentAnalyzer
+from app.database import engine
+from app.models import scan_db
+
+# Veritabanı tablolarını oluştur
+scan_db.Base.metadata.create_all(bind=engine)
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +37,7 @@ app = FastAPI(
 # CORS Ayarları: Web Dashboard ve Mobile App'in lokalde/sunucuda API'ye erişebilmesi için
 origins = [
     "http://localhost:3000",      # React / Next.js Web Dashboard
+    "http://localhost:5173",      # Vite default
     "http://localhost:8080",
     "*"                           # Geliştirme aşamasında her şeye açık, canlıda kısıtlanmalı
 ]
@@ -46,6 +52,7 @@ app.add_middleware(
 
 # Router'ları (Endpoint Kontrolcüleri) ana uygulamaya bağlıyoruz
 app.include_router(scanner.router, prefix="/api/v1/scan", tags=["Scanner"])
+app.include_router(history.router, prefix="/api/v1/history", tags=["History"])
 
 @app.get("/")
 async def root():

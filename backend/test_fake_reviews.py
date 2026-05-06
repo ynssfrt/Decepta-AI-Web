@@ -20,6 +20,24 @@ def test_system_with_mock_data():
                 "güzel güzel güzel güzel güzel güzel", # Sahte: Aşırı kelime tekrarı
                 "iyi", # Sahte: Çok kısa ama yüksek ihtimalle 5 yıldızlı pozitif (bot paterni)
                 "asdfghjklqwertyuiopzxcvbnmasdfghjklqwertyuiop" # Sahte: Anlamsız uzun metin
+            ],
+            "detailed_reviews": [
+                {
+                    "text": "Ürün gerçekten harika, kargolama çok hızlıydı kesinlikle tavsiye ederim.",
+                    "images": ["http://dummyimage.com/150x150/000/fff.png&text=Resim1"] # Orijinal resim
+                },
+                {
+                    "text": "güzel güzel güzel güzel güzel güzel",
+                    "images": ["http://dummyimage.com/150x150/f00/fff.png&text=Sahte"] # Kopya resim 1
+                },
+                {
+                    "text": "iyi",
+                    "images": ["http://dummyimage.com/150x150/f00/fff.png&text=Sahte"] # Kopya resim 2 (Aynı url/görsel)
+                },
+                {
+                    "text": "  ", # BOŞ YORUM
+                    "images": ["http://dummyimage.com/150x150/0f0/000.png&text=EmptyText"] # Şüpheli: Metin yok ama resim var
+                }
             ]
         }
     }

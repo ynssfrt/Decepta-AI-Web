@@ -66,12 +66,13 @@ document.getElementById('scan-btn').addEventListener('click', async () => {
         debugInfo.classList.remove('hidden');
         if (pageData && pageData.extracted_data) {
             const ed = pageData.extracted_data;
+            const photoCount = ed.photo_reviews_count || 0;
             let debugHtml = `
-                <b>🔍 Eklenti Çıktısı:</b><br>
+                <b>🔍 Eklenti Çıktısı (v7):</b><br>
                 📊 Puan: <b>${ed.score}</b> (${ed.debug_source || '?'})<br>
                 📝 Değerlendirme: <b>${ed.total_ratings}</b><br>
                 💬 Yorum: <b>${ed.total_reviews}</b><br>
-                📄 Çekilen yorum metni: <b>${ed.comments.length}</b>
+                📸 Fotoğraflı yorum: <b>${photoCount}</b>
             `;
             if (ed.total_reviews === 0 && ed.comments.length === 0) {
                 debugHtml += `<br><br>⚠️ <b>Yorum bulunamadı.</b>`;

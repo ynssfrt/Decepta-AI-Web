@@ -1,5 +1,8 @@
 import logging
-from transformers import pipeline
+try:
+    TRANSFORMERS_AVAILABLE = True
+except:
+    TRANSFORMERS_AVAILABLE = False
 
 logger = logging.getLogger(__name__)
 
@@ -15,15 +18,15 @@ class SentimentAnalyzer:
         Ağır bir işlem olduğu için uygulama ayağa kalkarken (Singleton) 1 kere çalıştırılmalıdır.
         """
         self.model_name = model_name
-        self.analyzer = None
-        
         try:
             logger.info(f"Model yükleniyor: {self.model_name}")
             # HuggingFace pipeline otomatik olarak modeli indirip yükler
+            from transformers import pipeline
             self.analyzer = pipeline("sentiment-analysis", model=self.model_name)
             logger.info("Model başarıyla yüklendi.")
-        except Exception as e:
-            logger.error(f"HuggingFace model yüklenirken hata oluştu: {str(e)}")
+        except (Exception, MemoryError) as e:
+            logger.error(f"HuggingFace model yüklenirken hafıza veya sistem hatası oluştu: {str(e)}")
+            logger.warning("Sistem hafızası yetersiz olduğu için 'Dummy Mode' aktif edildi.")
             # Fallback (Dummy) mekanizması
             self.analyzer = None
 

@@ -11,8 +11,13 @@ function App() {
     const [errorMsg, setErrorMsg] = useState('');
 
     const [analysisResult, setAnalysisResult] = useState(null);
+    const [currentTab, setCurrentTab] = useState('live'); // 'live' veya 'history'
+    const [historyData, setHistoryData] = useState([]);
+    const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+    const [expandedHistoryId, setExpandedHistoryId] = useState(null);
 
     const API_BASE_URL = 'http://127.0.0.1:8000/api/v1/scan';
+    const API_HISTORY_URL = 'http://127.0.0.1:8000/api/v1/history';
 
     useEffect(() => {
         // Extension üzerinden gelen task_id'yi yakala
@@ -61,141 +66,253 @@ function App() {
         };
     }, [taskId, isAnalyzing]);
 
+    // Geçmiş sekmesine tıklandığında verileri çek
+    useEffect(() => {
+        if (currentTab === 'history') {
+            fetchHistory();
+        }
+    }, [currentTab]);
+
+    const fetchHistory = async () => {
+        setIsLoadingHistory(true);
+        try {
+            const res = await fetch(API_HISTORY_URL);
+            if (!res.ok) throw new Error("Geçmiş verileri alınamadı.");
+            const data = await res.json();
+            setHistoryData(data);
+        } catch (err) {
+            console.error(err);
+        } finally {
+            setIsLoadingHistory(false);
+        }
+    };
+
+    const toggleHistoryDetail = (id) => {
+        if (expandedHistoryId === id) setExpandedHistoryId(null);
+        else setExpandedHistoryId(id);
+    };
+
     return (
         <div className="dashboard-container">
             <header>
                 <h1>Decepta AI</h1>
                 <p>B2B Analist Paneli & Gerçek Zamanlı DOM Kazıma</p>
+                
+                <div className="nav-tabs">
+                    <button 
+                        className={`tab-btn ${currentTab === 'live' ? 'active' : ''}`}
+                        onClick={() => setCurrentTab('live')}
+                    >
+                        Canlı Analiz
+                    </button>
+                    <button 
+                        className={`tab-btn ${currentTab === 'history' ? 'active' : ''}`}
+                        onClick={() => setCurrentTab('history')}
+                    >
+                        Geçmiş Taramalar
+                    </button>
+                </div>
             </header>
 
             <main>
-                {!isAnalyzing && !showResults && (
-                    <div className="waiting-container">
-                        <div className="radar-wrapper">
-                            <div className="radar-ring"></div>
-                            <div className="radar-ring"></div>
-                            <div className="radar-ring"></div>
-                            <div className="radar-core">📡</div>
-                        </div>
-                        <div className="waiting-text">
-                            <h2>Sistem Hazır</h2>
-                            <p>Tarayıcı eklentisinden analiz verisi bekleniyor. Lütfen Trendyol veya Hepsiburada üzerinde bir ürün sayfasına gidip eklentiyi çalıştırın.</p>
-                        </div>
-                        
-                        <div className="status-cards">
-                            <div className="status-card">
-                                <div className="val">24.5K</div>
-                                <div className="lbl">Bugün İncelenen Yorum</div>
-                            </div>
-                            <div className="status-card">
-                                <div className="val">1,240</div>
-                                <div className="lbl">Yakalanan Bot</div>
-                            </div>
-                            <div className="status-card">
-                                <div className="val">%99.8</div>
-                                <div className="lbl">Sistem Uptime</div>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {errorMsg && (
-                    <div style={{ color: "var(--accent-red)", textAlign: "center", marginBottom: "2rem", background: "rgba(239, 68, 68, 0.1)", padding: "1rem", borderRadius: "10px" }}>
-                        ❌ {errorMsg}
-                    </div>
-                )}
-
-                {isAnalyzing && (
-                    <div className="glass-card" style={{ marginBottom: '2rem', textAlign: 'center' }}>
-                        <h3 style={{ color: 'var(--accent-blue)', marginBottom: '1rem' }}>{currentStep}</h3>
-                        <div style={{ background: 'var(--bg-dark)', borderRadius: '10px', height: '20px', overflow: 'hidden' }}>
-                            <div style={{
-                                background: 'linear-gradient(90deg, var(--accent-blue), var(--accent-green))',
-                                height: '100%',
-                                width: `${progress}%`,
-                                transition: 'width 0.5s ease'
-                            }} />
-                        </div>
-                        <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>%{progress} Tamamlandı</p>
-                    </div>
-                )}
-
-                {showResults && analysisResult && (
+                {currentTab === 'live' && (
                     <>
-                        {/* Metrikler */}
-                        <div className="results-grid" style={{ marginBottom: '2rem' }}>
-                            <div className="glass-card">
-                                <h3>Gerçek Güven Skoru</h3>
-                                <div className="score-display">
-                                    <span className={`score-value ${analysisResult.true_trust_score < 3.0 ? 'danger' : 'safe'}`}>
-                                        {analysisResult.true_trust_score}
-                                    </span>
-                                    <span className="score-max">/ 5.0</span>
+                        {!isAnalyzing && !showResults && (
+                            <div className="waiting-container">
+                                <div className="radar-wrapper">
+                                    <div className="radar-ring"></div>
+                                    <div className="radar-ring"></div>
+                                    <div className="radar-ring"></div>
+                                    <div className="radar-core">📡</div>
                                 </div>
-                                <div className="bot-percentage">
-                                    Toplam {analysisResult.total_reviews} yazılı yorum incelendi. İhlal oranı: %{analysisResult.bot_percentage}
+                                <div className="waiting-text">
+                                    <h2>Sistem Hazır</h2>
+                                    <p>Tarayıcı eklentisinden analiz verisi bekleniyor. Lütfen Trendyol veya Hepsiburada üzerinde bir ürün sayfasına gidip eklentiyi çalıştırın.</p>
                                 </div>
-                            </div>
-
-                            <div className="glass-card">
-                                <h3>İstatistikler</h3>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
-                                    <div className="stat-row">
-                                        <span className="stat-label">Toplam Değerlendirme Puanı:</span>
-                                        <strong className="stat-val">{analysisResult.total_ratings}</strong>
+                                
+                                <div className="status-cards">
+                                    <div className="status-card">
+                                        <div className="val">24.5K</div>
+                                        <div className="lbl">Bugün İncelenen Yorum</div>
                                     </div>
-                                    <div className="stat-row">
-                                        <span className="stat-label">Toplam Yazılı Yorum:</span>
-                                        <strong className="stat-val">{analysisResult.total_reviews}</strong>
+                                    <div className="status-card">
+                                        <div className="val">1,240</div>
+                                        <div className="lbl">Yakalanan Bot</div>
                                     </div>
-                                    <div className="stat-row">
-                                        <span className="stat-label" style={{ color: 'var(--accent-red)' }}>Şüpheli Yorum Tespiti:</span>
-                                        <strong className="stat-val" style={{ color: 'var(--accent-red)' }}>{analysisResult.suspicious_reviews?.length || 0}</strong>
+                                    <div className="status-card">
+                                        <div className="val">%99.8</div>
+                                        <div className="lbl">Sistem Uptime</div>
                                     </div>
                                 </div>
                             </div>
+                        )}
 
-                            <div className="glass-card">
-                                <h3>E-Ticaret Sitesi Skoru</h3>
-                                <div className="score-display">
-                                    <span className="score-value safe">{analysisResult.platform_score}</span>
-                                    <span className="score-max">/ 5.0</span>
-                                </div>
-                                <p style={{ color: 'var(--text-muted)', marginTop: '1rem', fontSize: '0.9rem' }}>
-                                    E-ticaret arayüzünde görünen manipüle edilmiş genel ortalama.
-                                </p>
+                        {errorMsg && (
+                            <div style={{ color: "var(--accent-red)", textAlign: "center", marginBottom: "2rem", background: "rgba(239, 68, 68, 0.1)", padding: "1rem", borderRadius: "10px" }}>
+                                ❌ {errorMsg}
                             </div>
-                        </div>
+                        )}
 
-                        {/* Suspicious Reviews List */}
-                        {analysisResult.suspicious_reviews && analysisResult.suspicious_reviews.length > 0 && (
-                            <div className="glass-card" style={{ width: '100%' }}>
-                                <h3 style={{ color: 'var(--accent-red)', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
-                                    Ağ İhlali Tespit Edilen Yorumlar
-                                </h3>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
-                                    {analysisResult.suspicious_reviews.map((rev, idx) => (
-                                        <div key={idx} className="review-item">
-                                            <p className="review-text">
-                                                "{rev.text}"
-                                            </p>
-                                            <span className="review-reason">
-                                                🕵️ Sebep: {rev.reason}
+                        {isAnalyzing && (
+                            <div className="glass-card" style={{ marginBottom: '2rem', textAlign: 'center' }}>
+                                <h3 style={{ color: 'var(--accent-blue)', marginBottom: '1rem' }}>{currentStep}</h3>
+                                <div style={{ background: 'var(--bg-dark)', borderRadius: '10px', height: '20px', overflow: 'hidden' }}>
+                                    <div style={{
+                                        background: 'linear-gradient(90deg, var(--accent-blue), var(--accent-green))',
+                                        height: '100%',
+                                        width: `${progress}%`,
+                                        transition: 'width 0.5s ease'
+                                    }} />
+                                </div>
+                                <p style={{ marginTop: '0.5rem', color: 'var(--text-muted)' }}>%{progress} Tamamlandı</p>
+                            </div>
+                        )}
+
+                        {showResults && analysisResult && (
+                            <>
+                                {/* Metrikler */}
+                                <div className="results-grid" style={{ marginBottom: '2rem' }}>
+                                    <div className="glass-card">
+                                        <h3>Gerçek Güven Skoru</h3>
+                                        <div className="score-display">
+                                            <span className={`score-value ${analysisResult.true_trust_score < 3.0 ? 'danger' : 'safe'}`}>
+                                                {analysisResult.true_trust_score}
                                             </span>
+                                            <span className="score-max">/ 5.0</span>
                                         </div>
-                                    ))}
+                                        <div className="bot-percentage">
+                                            Toplam {analysisResult.total_reviews} yazılı yorum incelendi. İhlal oranı: %{analysisResult.bot_percentage}
+                                        </div>
+                                    </div>
+
+                                    <div className="glass-card">
+                                        <h3>İstatistikler</h3>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem', marginTop: '1rem' }}>
+                                            <div className="stat-row">
+                                                <span className="stat-label">Toplam Değerlendirme Sayısı:</span>
+                                                <strong className="stat-val">{analysisResult.total_ratings}</strong>
+                                            </div>
+                                            <div className="stat-row">
+                                                <span className="stat-label">Toplam Yazılı Yorum:</span>
+                                                <strong className="stat-val">{analysisResult.total_reviews}</strong>
+                                            </div>
+                                            <div className="stat-row">
+                                                <span className="stat-label">Fotoğraflı Değerlendirme:</span>
+                                                <strong className="stat-val" style={{ color: 'var(--accent-blue)' }}>{analysisResult.photo_reviews_count || 0}</strong>
+                                            </div>
+                                            <div className="stat-row">
+                                                <span className="stat-label" style={{ color: 'var(--accent-red)' }}>Şüpheli Yorum Tespiti:</span>
+                                                <strong className="stat-val" style={{ color: 'var(--accent-red)' }}>{analysisResult.suspicious_reviews?.length || 0}</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="glass-card">
+                                        <h3>E-Ticaret Sitesi Skoru</h3>
+                                        <div className="score-display">
+                                            <span className="score-value safe">{analysisResult.platform_score}</span>
+                                            <span className="score-max">/ 5.0</span>
+                                        </div>
+                                        <p style={{ color: 'var(--text-muted)', marginTop: '1rem', fontSize: '0.9rem' }}>
+                                            E-ticaret arayüzünde görünen manipüle edilmiş genel ortalama.
+                                        </p>
+                                    </div>
                                 </div>
-                            </div>
-                        )}
 
-                        {analysisResult.suspicious_reviews && analysisResult.suspicious_reviews.length === 0 && (
-                            <div className="glass-card" style={{ width: '100%', textAlign: 'center' }}>
-                                <h3 style={{ color: 'var(--accent-green)' }}>Hiçbir Şüpheli Yorum Bulunamadı</h3>
-                                <p style={{ color: 'var(--text-muted)', marginTop: '1rem' }}>Ürün incelemeleri organik görünüyor. Bot ağ tespiti sıfır (0).</p>
-                            </div>
-                        )}
+                                {/* Suspicious Reviews List */}
+                                {analysisResult.suspicious_reviews && analysisResult.suspicious_reviews.length > 0 && (
+                                    <div className="glass-card" style={{ width: '100%' }}>
+                                        <h3 style={{ color: 'var(--accent-red)', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-color)', paddingBottom: '1rem' }}>
+                                            Ağ İhlali Tespit Edilen Yorumlar
+                                        </h3>
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                                            {analysisResult.suspicious_reviews.map((rev, idx) => (
+                                                <div key={idx} className="review-item">
+                                                    <p className="review-text">
+                                                        "{rev.text}"
+                                                    </p>
+                                                    <span className="review-reason">
+                                                        🕵️ Sebep: {rev.reason}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
 
+                                {analysisResult.suspicious_reviews && analysisResult.suspicious_reviews.length === 0 && (
+                                    <div className="glass-card" style={{ width: '100%', textAlign: 'center' }}>
+                                        <h3 style={{ color: 'var(--accent-green)' }}>Hiçbir Şüpheli Yorum Bulunamadı</h3>
+                                        <p style={{ color: 'var(--text-muted)', marginTop: '1rem' }}>Ürün incelemeleri organik görünüyor. Bot ağ tespiti sıfır (0).</p>
+                                    </div>
+                                )}
+                            </>
+                        )}
                     </>
+                )}
+
+                {currentTab === 'history' && (
+                    <div className="history-container">
+                        {isLoadingHistory ? (
+                            <div className="loading-history">Veriler yükleniyor...</div>
+                        ) : historyData.length === 0 ? (
+                            <div className="glass-card" style={{ textAlign: 'center' }}>Henüz kaydedilmiş bir tarama yok.</div>
+                        ) : (
+                            <div className="history-grid">
+                                {historyData.map(item => (
+                                    <div key={item.id} className="glass-card history-card">
+                                        <div className="history-header">
+                                            <div className="history-date">
+                                                {new Date(item.created_at).toLocaleString('tr-TR')}
+                                            </div>
+                                            <a href={item.url} target="_blank" rel="noreferrer" className="history-url">
+                                                Ürüne Git ↗
+                                            </a>
+                                        </div>
+                                        
+                                        <div className="history-scores">
+                                            <div className="h-score">
+                                                <span className="h-lbl">Güven Skoru</span>
+                                                <span className={`h-val ${item.true_trust_score < 3.0 ? 'danger' : 'safe'}`}>
+                                                    {item.true_trust_score}
+                                                </span>
+                                            </div>
+                                            <div className="h-score">
+                                                <span className="h-lbl">Bot Oranı</span>
+                                                <span className="h-val">%{item.bot_percentage}</span>
+                                            </div>
+                                            <div className="h-score">
+                                                <span className="h-lbl">İncelenen</span>
+                                                <span className="h-val">{item.total_reviews} Yorum</span>
+                                            </div>
+                                        </div>
+
+                                        <button 
+                                            className="toggle-detail-btn"
+                                            onClick={() => toggleHistoryDetail(item.id)}
+                                        >
+                                            {expandedHistoryId === item.id ? 'Detayları Gizle' : 'Şüpheli Yorumları Gör'}
+                                        </button>
+
+                                        {expandedHistoryId === item.id && item.suspicious_reviews && (
+                                            <div className="history-details">
+                                                {item.suspicious_reviews.length === 0 ? (
+                                                    <p className="no-suspicious">Temiz - Şüpheli Yorum Yok</p>
+                                                ) : (
+                                                    item.suspicious_reviews.map((rev, idx) => (
+                                                        <div key={idx} className="h-rev-item">
+                                                            <p>"{rev.text}"</p>
+                                                            <small>Sebep: {rev.reason}</small>
+                                                        </div>
+                                                    ))
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
                 )}
             </main>
         </div>
