@@ -385,7 +385,8 @@
                             // ratingSummary (52) ile productReviews (26) karışmaması için doğrudan productReviews bloğunu hedefle
                             const prIndex = relevantTxt.indexOf('"productReviews"');
                             if (prIndex > -1) {
-                                const prBlock = relevantTxt.substring(prIndex, prIndex + 500); // Sadece o bloğu al
+                                // 500 karakter limiti, objenin içindeki yorum array'i uzunsa sayıyı kesiyordu. Limiti kaldırıyoruz.
+                                const prBlock = relevantTxt.substring(prIndex); 
                                 
                                 const totalMatch = prBlock.match(/"totalReviewCount"\s*:\s*(\d+)/);
                                 if (totalMatch) {
