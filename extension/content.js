@@ -335,24 +335,39 @@
             if (typeof window.__hb_commentCount !== 'undefined') {
                 commentCount = window.__hb_commentCount;
             } else {
-                // Sayfadaki script'leri tarayıp __HB_REVIEWS_INITIAL_STATE__ içinden bulmayı dene
-                const scripts = document.querySelectorAll('script');
-                for (let i = 0; i < scripts.length; i++) {
-                    const txt = scripts[i].textContent || '';
-                    if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
-                        try {
-                            const m = txt.match(/window\.__HB_REVIEWS_INITIAL_STATE__\s*=\s*(\{.+?\});/);
-                            if (m) {
-                                const state = JSON.parse(m[1]);
-                                if (state?.reviews?.summary?.totalReviewCount) {
-                                    commentCount = parseInt(state.reviews.summary.totalReviewCount);
+                // YÖNTEM 1: Sayfa HTML'sindeki API JSON verisini doğrudan regex ile ara
+                // Bu yöntem JSON parse hatalarını aşar ve state objesi adları değişse de çalışır.
+                const html = document.documentElement.outerHTML || '';
+                const totalReviewMatch = html.match(/"totalReviewCount"\s*:\s*(\d+)/);
+                if (totalReviewMatch) {
+                    commentCount = parseInt(totalReviewMatch[1]);
+                }
+                
+                const mediaReviewMatch = html.match(/"approvedMediaReviewCount"\s*:\s*(\d+)/);
+                if (mediaReviewMatch) {
+                    window.__hb_photoCount = parseInt(mediaReviewMatch[1]);
+                }
+                
+                // YÖNTEM 2: Eğer regex HTML'de bulamazsa script tagleri içinde klasik JSON parse dene
+                if (commentCount === 0) {
+                    const scripts = document.querySelectorAll('script');
+                    for (let i = 0; i < scripts.length; i++) {
+                        const txt = scripts[i].textContent || '';
+                        if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
+                            try {
+                                const m = txt.match(/window\.__HB_REVIEWS_INITIAL_STATE__\s*=\s*(\{.+?\});/);
+                                if (m) {
+                                    const state = JSON.parse(m[1]);
+                                    if (state?.reviews?.summary?.totalReviewCount) {
+                                        commentCount = parseInt(state.reviews.summary.totalReviewCount);
+                                    }
+                                    if (state?.reviews?.summary?.approvedMediaReviewCount) {
+                                        window.__hb_photoCount = parseInt(state.reviews.summary.approvedMediaReviewCount);
+                                    }
                                 }
-                                if (state?.reviews?.summary?.approvedMediaReviewCount) {
-                                    window.__hb_photoCount = parseInt(state.reviews.summary.approvedMediaReviewCount);
-                                }
-                            }
-                        } catch(e) {}
-                        break;
+                            } catch(e) {}
+                            break;
+                        }
                     }
                 }
             }
