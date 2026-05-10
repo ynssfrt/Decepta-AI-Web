@@ -311,69 +311,54 @@
             }
         }
 
-        // Hepsiburada'da "Yorum" yerine "Değerlendirme" kullanılıyor
-        // Ancak bazı değerlendirmeler yorum metni içerMEZ (sadece yıldız)
+        // ========== HEPSİBURADA: YORUM SAYISI ==========
         if (commentCount === 0 && isHepsiburada) {
-            // Yöntem A: Filtre etiketlerinden "Yorumlu (X)" sayısını bul
-            const filterTags = document.querySelectorAll('[class*="FilterTag"], [class*="filterTag"], [class*="filter-tag"]');
-            for (const tag of filterTags) {
-                const text = (tag.innerText || '').trim();
-                const yorumluMatch = text.match(/[Yy]orumlu\s*\(?(\d[\d.]*)\)?/);
-                if (yorumluMatch) {
-                    commentCount = parseInt(yorumluMatch[1].replace(/\./g, ''));
-                    break;
-                }
+            // bodyText'te "Yorumlu (X)" veya "Yorumlu X" formatını ara
+            const yorumluBody = bodyText.match(/[Yy]orumlu\s*\(?(\d[\d.]*)\)?/);
+            if (yorumluBody) {
+                commentCount = parseInt(yorumluBody[1].replace(/\./g, ''));
             }
-            // Yöntem B: Sayfadaki metinden "X yorum" ifadesini ara
+            // DOM'daki ReviewCard'ların içinde metin olanları say
             if (commentCount === 0) {
-                const yorumMatch = bodyText.match(/(\d[\d.]*)\s*[Yy]orum(?!\s*yazın)/);
-                if (yorumMatch) {
-                    const val = parseInt(yorumMatch[1].replace(/\./g, ''));
-                    if (val > 0 && val <= ratingsCount) commentCount = val;
-                }
+                const reviewCards = document.querySelectorAll('[class*="ReviewCard-module"], [class*="hermes-ReviewCard"]');
+                let withText = 0;
+                reviewCards.forEach(card => {
+                    const allText = (card.innerText || '').trim();
+                    if (allText.length > 60) withText++;
+                });
+                if (withText > 0) commentCount = withText;
             }
-            // Yöntem C: DOM'daki metin içeren yorum kartlarını say
             if (commentCount === 0) {
                 commentCount = comments.filter(c => c !== '[Sadece Görsel]' && c.length > 5).length;
             }
-            // Son çare: Eğer hâlâ 0 ise ve DOM'da yorum varsa, o sayıyı kullan
             if (commentCount === 0 && ratingsCount > 0) {
                 commentCount = comments.length > 0 ? comments.length : ratingsCount;
             }
         }
         
-        // Fallback: commentCount bulunamadıysa, DOM'daki yorum adedini kullan
+        // Fallback
         if (commentCount === 0) commentCount = comments.length;
 
-        // ========== 7.5 FOTOĞRAFLI YORUM SAYISI ==========
+        // ========== FOTOĞRAFLI YORUM SAYISI ==========
         let photoReviewsCount = 0;
         
-        // Yöntem 1 (En güvenilir): HB Filtre etiketlerinden "Fotoğraflı (X)" 
+        // HB: bodyText'ten "Fotoğraflı (X)" veya "Fotoğraflı X" formatını ara
         if (isHepsiburada) {
-            const filterTags = document.querySelectorAll('[class*="FilterTag"], [class*="filterTag"], [class*="filter-tag"]');
-            for (const tag of filterTags) {
-                const text = (tag.innerText || '').trim();
-                const fotoMatch = text.match(/[Ff]oto(?:ğ|g)rafl[ıi]\s*\(?(\d[\d.]*)\)?/);
-                if (fotoMatch) {
-                    photoReviewsCount = parseInt(fotoMatch[1].replace(/\./g, ''));
-                    break;
-                }
+            const fotoBody = bodyText.match(/[Ff]oto(?:ğ|g)rafl[ıi]\s*\(?(\d[\d.]*)\)?/);
+            if (fotoBody) {
+                photoReviewsCount = parseInt(fotoBody[1].replace(/\./g, ''));
             }
         }
         
-        // Yöntem 2: Sayfa metninden regex
-        if (photoReviewsCount === 0) {
+        // Trendyol + genel fallback
+        if (photoReviewsCount === 0 && !isHepsiburada) {
             const photoPatterns = [
                 /[Ff]oto(?:ğ|g)rafl[ıi]\s*\(?(\d[\d.]*)\)?/,
                 /(\d[\d.]*)\s*(?:adet\s*)?fotoğraflı/i,
-                /görsel(?:li)?\s*(?:yorum(?:lar)?)?\s*\(?(\d[\d.]*)\)?/i
             ];
             for (const pat of photoPatterns) {
                 const m = bodyText.match(pat);
-                if (m) {
-                    photoReviewsCount = parseInt(m[1].replace(/\./g, ''));
-                    break;
-                }
+                if (m) { photoReviewsCount = parseInt(m[1].replace(/\./g, '')); break; }
             }
         }
         
