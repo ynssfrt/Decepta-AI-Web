@@ -355,10 +355,7 @@
                 hbSuccess = true;
             }
             
-            // ======= YÖNTEM 2: Script bloğu (HER ZAMAN fotoğraf için çalışır) =======
-            // NOT: Script'teki totalReviewCount = Değerlendirme sayısıdır (52).
-            //       Yazılı yorum sayısı (26) için ayrı anahtar YOK.
-            //       approvedMediaReviewCount = Fotoğraflı yorum sayısı (4) — BU VAR!
+            // ======= YÖNTEM 2: Script bloğu =======
             const scripts = document.querySelectorAll('script');
             for (let i = 0; i < scripts.length; i++) {
                 const txt = scripts[i].textContent || '';
@@ -366,27 +363,65 @@
                     const stateIndex = txt.indexOf('__HB_REVIEWS_INITIAL_STATE__');
                     const stateTxt = txt.substring(stateIndex);
                     
-                    // Fotoğraf sayısını al (approvedMediaReviewCount veya totalPhotoCount)
+                    // --- Fotoğraf sayısı ---
                     if (!hbPhotoFound) {
-                        const mediaMatch = stateTxt.match(/"(?:approvedMediaReviewCount|totalPhotoCount|mediaCount|withMediaCount|photoReviewCount)"\s*:\s*(\d+)/);
+                        const mediaMatch = stateTxt.match(/"(?:approvedMediaReviewCount|totalPhotoCount)"\s*:\s*(\d+)/);
                         if (mediaMatch) {
                             window.__hb_photoCount = parseInt(mediaMatch[1]);
                             hbPhotoFound = true;
                         }
                     }
                     
-                    // Yorum sayısını al (commentCount varsa onu kullan, yoksa totalReviewCount)
+                    // --- Yorum sayısı ---
+                    // HB'de ratingSummary.totalReviewCount = Değerlendirme (52)
+                    //       productReviews.totalReviewCount = Yazılı yorum (26) [FARKLI!]
+                    // İkisi de "totalReviewCount" ama ratingSummary ÖNCE gelir.
+                    // Bu yüzden productReviews bloğundaki değeri AYRI çekmemiz lazım.
                     if (!hbSuccess) {
-                        // Önce spesifik commentCount anahtarını dene (bazı sayfalarda var)
-                        const commentMatch = stateTxt.match(/"(?:commentCount|approvedCommentCount|textReviewCount|writtenReviewCount)"\s*:\s*(\d+)/);
-                        if (commentMatch) {
-                            commentCount = parseInt(commentMatch[1]);
+                        // ratingSummary'deki totalReviewCount (52) — bu Değerlendirme
+                        let ratingSummaryCount = 0;
+                        const rsIndex = stateTxt.indexOf('"ratingSummary"');
+                        if (rsIndex > -1) {
+                            const rsBlock = stateTxt.substring(rsIndex, rsIndex + 500);
+                            const rsMatch = rsBlock.match(/"totalReviewCount"\s*:\s*(\d+)/);
+                            if (rsMatch) ratingSummaryCount = parseInt(rsMatch[1]);
+                        }
+                        
+                        // productReviews'deki totalReviewCount (26) — bu Yazılı Yorum
+                        let productReviewsCount = 0;
+                        const prIndex = stateTxt.indexOf('"productReviews"');
+                        if (prIndex > -1) {
+                            const prBlock = stateTxt.substring(prIndex, prIndex + 500);
+                            const prMatch = prBlock.match(/"totalReviewCount"\s*:\s*(\d+)/);
+                            if (prMatch) productReviewsCount = parseInt(prMatch[1]);
+                        }
+                        
+                        if (ratingSummaryCount > 0 && productReviewsCount > 0 && productReviewsCount !== ratingSummaryCount) {
+                            // İkisi farklıysa, küçük olan = yazılı yorum
+                            commentCount = Math.min(ratingSummaryCount, productReviewsCount);
                             hbSuccess = true;
-                        } else {
-                            // Yoksa totalReviewCount'u (değerlendirme) al — HB'de tek mevcut sayı bu
-                            const totalMatch = stateTxt.match(/"totalReviewCount"\s*:\s*(\d+)/);
-                            if (totalMatch) {
-                                commentCount = parseInt(totalMatch[1]);
+                        } else if (productReviewsCount > 0) {
+                            commentCount = productReviewsCount;
+                            hbSuccess = true;
+                        } else if (ratingSummaryCount > 0) {
+                            // Tek değer varsa pagination ile doğrulama yap
+                            // pageCount ve mevcut sayfadaki kart sayısından tahmini yorum sayısı hesapla
+                            const pageCountMatch = stateTxt.match(/"pageCount"\s*:\s*(\d+)/);
+                            const pageSizeMatch = stateTxt.match(/"pageSize"\s*:\s*(\d+)/);
+                            if (pageCountMatch) {
+                                const pageCount = parseInt(pageCountMatch[1]);
+                                const pageSize = pageSizeMatch ? parseInt(pageSizeMatch[1]) : 5;
+                                // Son sayfa tam dolmayabilir, ama bu bir üst sınır tahmindir
+                                const estimatedReviews = pageCount * pageSize;
+                                // Eğer tahmin Değerlendirme'den farklıysa, tahmini kullan
+                                if (estimatedReviews < ratingSummaryCount) {
+                                    commentCount = estimatedReviews;
+                                    hbSuccess = true;
+                                }
+                            }
+                            
+                            if (!hbSuccess) {
+                                commentCount = ratingSummaryCount;
                                 hbSuccess = true;
                             }
                         }
