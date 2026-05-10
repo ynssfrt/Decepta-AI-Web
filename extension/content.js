@@ -341,68 +341,85 @@
                 commentCount = window.__hb_commentCount;
                 hbSuccess = true;
             } else {
-                // YÖNTEM 1: Sayfadaki <script> tag'lerinin orijinal metni (DOM) üzerinden veriyi oku.
-                // Bu yöntem CSP (Content Security Policy) hatası vermez ve sayfa window objesini silse bile çalışır.
+            // YÖNTEM 1: Arayüzdeki filtre butonları (Kesin ve görünür sayılar)
+            let safeText = bodyText;
+            const reviewContainer = document.querySelector('[class*="ReviewList"], [class*="hermes-Review"], [id*="reviews"], [class*="Comments"]');
+            if (reviewContainer) {
+                safeText = reviewContainer.innerText || '';
+            } else {
+                const cutoff = safeText.search(/Benzer Ürünler|Önerilenler|Bunları da beğenebilirsiniz|Müşteriler bunları da aldı/i);
+                if (cutoff > 0) safeText = safeText.substring(0, cutoff);
+            }
+            
+            const yorumPatterns = [
+                /[Yy]orum(?:lu|lar)?\s*\(?(\d[\d.]*)\)?/,
+                /(\d[\d.]*)\s*[Yy]orum/i
+            ];
+            for (const pat of yorumPatterns) {
+                const m = safeText.match(pat);
+                if (m) {
+                    commentCount = parseInt(m[1].replace(/\./g, ''));
+                    hbSuccess = true;
+                    break;
+                }
+            }
+            
+            const fotoPatterns = [
+                /[Ff]oto(?:ğ|g)rafl[ıi]\s*(?:Yorum(?:lar)?\s*)?\(?(\d[\d.]*)\)?/,
+                /(\d[\d.]*)\s*(?:adet\s*)?fotoğraflı/i
+            ];
+            for (const pat of fotoPatterns) {
+                const m = safeText.match(pat);
+                if (m) {
+                    window.__hb_photoCount = parseInt(m[1].replace(/\./g, ''));
+                    break;
+                }
+            }
+            
+            // YÖNTEM 2: Eğer DOM'da bulunamadıysa Script Tag JSON'ından çek (Fallback)
+            if (!hbSuccess) {
                 const scripts = document.querySelectorAll('script');
                 for (let i = 0; i < scripts.length; i++) {
                     const txt = scripts[i].textContent || '';
-                    // Sadece ana ürünün verilerini tutan özel script bloklarında arama yap
                     if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
-                        const totalMatch = txt.match(/["']?(?:totalReviewCount|customerReviewCount|totalItemCount)["']?\s*:\s*(\d+)/);
-                        if (totalMatch) {
+                        // Sadece onaylanmış yorumları almaya çalış
+                        const customerMatch = txt.match(/["']?customerReviewCount["']?\s*:\s*(\d+)/);
+                        const totalMatch = txt.match(/["']?totalReviewCount["']?\s*:\s*(\d+)/);
+                        
+                        if (customerMatch) {
+                            commentCount = parseInt(customerMatch[1]);
+                            hbSuccess = true;
+                        } else if (totalMatch) {
                             commentCount = parseInt(totalMatch[1]);
                             hbSuccess = true;
                         }
                         
                         const mediaMatch = txt.match(/["']?(?:approvedMediaReviewCount|withMediaCount|photoReviewCount)["']?\s*:\s*(\d+)/);
-                        if (mediaMatch) window.__hb_photoCount = parseInt(mediaMatch[1]);
+                        if (mediaMatch && typeof window.__hb_photoCount === 'undefined') {
+                            window.__hb_photoCount = parseInt(mediaMatch[1]);
+                        }
                         
                         if (hbSuccess) break;
                     }
                 }
             }
             
-            // Eğer asıl veritabanından çekilemediyse fallback'e düş
-            if (!hbSuccess) {
-                // Diğer ürünlerin istatistiklerini almamak için sadece yorum bölgesini veya ana içeriği tara
-                let safeText = bodyText;
-                const reviewContainer = document.querySelector('[class*="ReviewList"], [class*="hermes-Review"], [id*="reviews"], [class*="Comments"]');
-                if (reviewContainer) {
-                    safeText = reviewContainer.innerText || '';
-                } else {
-                    const cutoff = safeText.search(/Benzer Ürünler|Önerilenler|Bunları da beğenebilirsiniz|Müşteriler bunları da aldı/i);
-                    if (cutoff > 0) safeText = safeText.substring(0, cutoff);
-                }
-                
-                const yorumPatterns = [
-                    /[Yy]orum(?:lu|lar)?\s*\(?(\d[\d.]*)\)?/,
-                    /(\d[\d.]*)\s*[Yy]orum/i
-                ];
-                for (const pat of yorumPatterns) {
-                    const m = safeText.match(pat);
-                    if (m) {
-                        commentCount = parseInt(m[1].replace(/\./g, ''));
-                        break;
-                    }
-                }
-                
-                if (commentCount === 0) {
-                    const reviewCards = document.querySelectorAll('[class*="ReviewCard-module"], [class*="hermes-ReviewCard"]');
-                    let withText = 0;
-                    reviewCards.forEach(card => {
-                        const allText = (card.innerText || '').trim();
-                        if (allText.length > 60) withText++;
-                    });
-                    if (withText > 0) commentCount = withText;
-                }
-                
-                if (commentCount === 0) {
-                    commentCount = comments.filter(c => c !== '[Sadece Görsel]' && c.length > 5).length;
-                }
-                
-                if (commentCount === 0 && ratingsCount > 0) {
-                    commentCount = comments.length > 0 ? comments.length : ratingsCount;
-                }
+            if (commentCount === 0) {
+                const reviewCards = document.querySelectorAll('[class*="ReviewCard-module"], [class*="hermes-ReviewCard"]');
+                let withText = 0;
+                reviewCards.forEach(card => {
+                    const allText = (card.innerText || '').trim();
+                    if (allText.length > 60) withText++;
+                });
+                if (withText > 0) commentCount = withText;
+            }
+            
+            if (commentCount === 0) {
+                commentCount = comments.filter(c => c !== '[Sadece Görsel]' && c.length > 5).length;
+            }
+            
+            if (commentCount === 0 && ratingsCount > 0) {
+                commentCount = comments.length > 0 ? comments.length : ratingsCount;
             }
         }
         
@@ -413,33 +430,8 @@
         let photoReviewsCount = 0;
         
         if (isHepsiburada) {
-            // HB: Script içerisinden okunduysa (NEXT_DATA'dan gelen veriyi yoksay)
             if (typeof window.__hb_photoCount !== 'undefined') {
                 photoReviewsCount = window.__hb_photoCount;
-            }
-            
-            // HB: bodyText'ten fallback
-            if (photoReviewsCount === 0) {
-                let safeText = bodyText;
-                const reviewContainer = document.querySelector('[class*="ReviewList"], [class*="hermes-Review"], [id*="reviews"], [class*="Comments"]');
-                if (reviewContainer) {
-                    safeText = reviewContainer.innerText || '';
-                } else {
-                    const cutoff = safeText.search(/Benzer Ürünler|Önerilenler|Bunları da beğenebilirsiniz|Müşteriler bunları da aldı/i);
-                    if (cutoff > 0) safeText = safeText.substring(0, cutoff);
-                }
-                
-                const fotoPatterns = [
-                    /[Ff]oto(?:ğ|g)rafl[ıi]\s*(?:Yorum(?:lar)?\s*)?\(?(\d[\d.]*)\)?/,
-                    /(\d[\d.]*)\s*(?:adet\s*)?fotoğraflı/i
-                ];
-                for (const pat of fotoPatterns) {
-                    const m = safeText.match(pat);
-                    if (m) {
-                        photoReviewsCount = parseInt(m[1].replace(/\./g, ''));
-                        break;
-                    }
-                }
             }
         } else {
             // Yöntem 1: __NEXT_DATA__ içinden bulunduysa (Sadece Trendyol vb. için)
