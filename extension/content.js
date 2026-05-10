@@ -344,39 +344,34 @@
             
             if (!hbSuccess) {
                 // YÖNTEM 1: Arayüzdeki filtre butonları (Kesin ve görünür sayılar)
-                let safeText = bodyText;
-                const reviewContainer = document.querySelector('[class*="ReviewList"], [class*="hermes-Review"], [id*="reviews"], [class*="Comments"]');
-                if (reviewContainer) {
-                    safeText = reviewContainer.innerText || '';
-                } else {
-                    const cutoff = safeText.search(/Benzer Ürünler|Önerilenler|Bunları da beğenebilirsiniz|Müşteriler bunları da aldı/i);
-                    if (cutoff > 0) safeText = safeText.substring(0, cutoff);
-                }
+                let cutoff = bodyText.search(/Benzer Ürünler|Önerilenler|Bunları da beğenebilirsiniz|Müşteriler bunları da aldı/i);
+                if (cutoff === -1) cutoff = bodyText.length;
                 
-                const yorumPatterns = [
-                    /[Yy]orum(?:lu|lar)?\s*\(?(\d[\d.]*)\)?/,
-                    /(\d[\d.]*)\s*[Yy]orum/i
-                ];
-                for (const pat of yorumPatterns) {
-                    const m = safeText.match(pat);
-                    if (m) {
-                        commentCount = parseInt(m[1].replace(/\./g, ''));
-                        hbSuccess = true;
-                        break;
-                    }
-                }
+                const filterElements = document.querySelectorAll('button, a, span, div[class*="Filter"], div[class*="filter"], div[class*="Tab"], div[class*="tab"]');
+                let foundYorum = false;
+                let foundFoto = false;
                 
-                const fotoPatterns = [
-                    /[Ff]oto(?:ğ|g)rafl[ıi]\s*(?:Yorum(?:lar)?\s*)?\(?(\d[\d.]*)\)?/,
-                    /(\d[\d.]*)\s*(?:adet\s*)?fotoğraflı/i
-                ];
-                for (const pat of fotoPatterns) {
-                    const m = safeText.match(pat);
-                    if (m) {
-                        window.__hb_photoCount = parseInt(m[1].replace(/\./g, ''));
-                        break;
+                filterElements.forEach(el => {
+                    const text = (el.innerText || '').trim();
+                    if (text.length > 5 && text.length < 40 && bodyText.indexOf(text) < cutoff) {
+                        if (!foundYorum) {
+                            const m = text.match(/[Yy]orum(?:lu|lar)?\s*\(?(\d[\d.]*)\)?/);
+                            if (m) { commentCount = parseInt(m[1].replace(/\./g, '')); foundYorum = true; hbSuccess = true; }
+                            else {
+                                const m2 = text.match(/(\d[\d.]*)\s*[Yy]orum/i);
+                                if (m2) { commentCount = parseInt(m2[1].replace(/\./g, '')); foundYorum = true; hbSuccess = true; }
+                            }
+                        }
+                        if (!foundFoto) {
+                            const m = text.match(/[Ff]oto(?:ğ|g)rafl[ıi]\s*(?:Yorum(?:lar)?\s*)?\(?(\d[\d.]*)\)?/);
+                            if (m) { window.__hb_photoCount = parseInt(m[1].replace(/\./g, '')); foundFoto = true; }
+                            else {
+                                const m2 = text.match(/(\d[\d.]*)\s*(?:adet\s*)?fotoğraflı/i);
+                                if (m2) { window.__hb_photoCount = parseInt(m2[1].replace(/\./g, '')); foundFoto = true; }
+                            }
+                        }
                     }
-                }
+                });
                 
                 // YÖNTEM 2: Eğer DOM'da bulunamadıysa Script Tag JSON'ından çek (Fallback)
                 if (!hbSuccess) {
@@ -384,31 +379,21 @@
                     for (let i = 0; i < scripts.length; i++) {
                         const txt = scripts[i].textContent || '';
                         if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
-                            try {
-                                const firstBrace = txt.indexOf('{');
-                                const lastBrace = txt.lastIndexOf('}');
-                                if (firstBrace > -1 && lastBrace > firstBrace) {
-                                    const jsonStr = txt.substring(firstBrace, lastBrace + 1);
-                                    const state = JSON.parse(jsonStr);
-                                    
-                                    if (state.productReviews) {
-                                        commentCount = parseInt(state.productReviews.totalReviewCount || 0);
-                                        window.__hb_photoCount = parseInt(state.productReviews.approvedMediaReviewCount || 0);
-                                        hbSuccess = true;
-                                    } else if (state.reviews && state.reviews.summary) {
-                                        commentCount = parseInt(state.reviews.summary.totalReviewCount || 0);
-                                        window.__hb_photoCount = parseInt(state.reviews.summary.approvedMediaReviewCount || 0);
-                                        hbSuccess = true;
-                                    }
-                                }
-                            } catch (e) {
-                                // JSON Parse fail
-                                const totalMatch = txt.match(/"productReviews"\s*:\s*\{[^}]*"totalReviewCount"\s*:\s*(\d+)/);
+                            const stateIndex = txt.indexOf('__HB_REVIEWS_INITIAL_STATE__');
+                            const relevantTxt = txt.substring(stateIndex);
+                            
+                            // ratingSummary (52) ile productReviews (26) karışmaması için doğrudan productReviews bloğunu hedefle
+                            const prIndex = relevantTxt.indexOf('"productReviews"');
+                            if (prIndex > -1) {
+                                const prBlock = relevantTxt.substring(prIndex, prIndex + 500); // Sadece o bloğu al
+                                
+                                const totalMatch = prBlock.match(/"totalReviewCount"\s*:\s*(\d+)/);
                                 if (totalMatch) {
                                     commentCount = parseInt(totalMatch[1]);
                                     hbSuccess = true;
                                 }
-                                const mediaMatch = txt.match(/"approvedMediaReviewCount"\s*:\s*(\d+)/);
+                                
+                                const mediaMatch = prBlock.match(/"approvedMediaReviewCount"\s*:\s*(\d+)/);
                                 if (mediaMatch && typeof window.__hb_photoCount === 'undefined') {
                                     window.__hb_photoCount = parseInt(mediaMatch[1]);
                                 }
