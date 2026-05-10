@@ -385,8 +385,7 @@
                             // ratingSummary (52) ile productReviews (26) karışmaması için doğrudan productReviews bloğunu hedefle
                             const prIndex = relevantTxt.indexOf('"productReviews"');
                             if (prIndex > -1) {
-                                // 500 karakter limiti, objenin içindeki yorum array'i uzunsa sayıyı kesiyordu. Limiti kaldırıyoruz.
-                                const prBlock = relevantTxt.substring(prIndex); 
+                                const prBlock = relevantTxt.substring(prIndex);
                                 
                                 const totalMatch = prBlock.match(/"totalReviewCount"\s*:\s*(\d+)/);
                                 if (totalMatch) {
@@ -394,9 +393,11 @@
                                     hbSuccess = true;
                                 }
                                 
-                                const mediaMatch = prBlock.match(/"approvedMediaReviewCount"\s*:\s*(\d+)/);
-                                if (mediaMatch && typeof window.__hb_photoCount === 'undefined') {
-                                    window.__hb_photoCount = parseInt(mediaMatch[1]);
+                                if (!foundFoto) {
+                                    const mediaMatch = prBlock.match(/"approvedMediaReviewCount"\s*:\s*(\d+)/);
+                                    if (mediaMatch) {
+                                        window.__hb_photoCount = parseInt(mediaMatch[1]);
+                                    }
                                 }
                             }
                             
@@ -405,36 +406,25 @@
                     }
                 }
                 
-                if (commentCount === 0) {
-                    const reviewCards = document.querySelectorAll('[class*="ReviewCard-module"], [class*="hermes-ReviewCard"]');
-                    let withText = 0;
-                    reviewCards.forEach(card => {
-                        const allText = (card.innerText || '').trim();
-                        if (allText.length > 60) withText++;
-                    });
-                    if (withText > 0) commentCount = withText;
-                }
-                
-                if (commentCount === 0) {
-                    commentCount = comments.filter(c => c !== '[Sadece Görsel]' && c.length > 5).length;
-                }
-                
-                if (commentCount === 0 && ratingsCount > 0) {
-                    commentCount = comments.length > 0 ? comments.length : ratingsCount;
-                }
+                // HEPSİBURADA İÇİN FALLBACK YOK!
+                // DOM'daki yorum kartlarını veya görselleri saymak,
+                // sayfa/scroll değiştikçe farklı sonuç vereceği için yapılmıyor.
+                // Eğer Yöntem 1 ve 2 bulamazsa commentCount = 0 kalacak.
             }
         }
         
-        // Fallback
-        if (commentCount === 0) commentCount = comments.length;
+        // Fallback (sadece Trendyol vb. için — HB zaten yukarıda ele alındı)
+        if (commentCount === 0 && !isHepsiburada) commentCount = comments.length;
 
         // ========== FOTOĞRAFLI YORUM SAYISI ==========
         let photoReviewsCount = 0;
         
         if (isHepsiburada) {
+            // HB: Yalnızca güvenilir kaynaklardan (buton veya script) alınan değeri kullan
             if (typeof window.__hb_photoCount !== 'undefined') {
                 photoReviewsCount = window.__hb_photoCount;
             }
+            // HB için DOM taraması (galeri, img sayma vb.) YAPILMIYOR.
         } else {
             // Yöntem 1: __NEXT_DATA__ içinden bulunduysa (Sadece Trendyol vb. için)
             if (typeof window.__ndPhotoCount !== 'undefined') {
@@ -454,81 +444,9 @@
             }
         }
         
-        // Yöntem A: detailedReviews içinden (Trendyol kart içi görseller)
-        if (photoReviewsCount === 0) {
+        // Yöntem A: detailedReviews içinden (Sadece Trendyol kart içi görseller)
+        if (photoReviewsCount === 0 && !isHepsiburada) {
             photoReviewsCount = detailedReviews.filter(r => r.images && r.images.length > 0).length;
-        }
-        
-        // Yöntem B: Hepsiburada "Kullanıcı fotoğraf ve videoları" galerisi
-        if (photoReviewsCount === 0) {
-            // HB'de fotoğraflar yorum kartlarının dışında ayrı bir galeri bölümünde gösteriliyor
-            // Bu galeri genellikle "Kullanıcı fotoğraf" başlığı altında
-            
-            // Galeri container'ını bul (class*="MediaGallery" veya "userMedia" veya başlıktan)
-            const gallerySelectors = [
-                '[class*="MediaGallery"]',
-                '[class*="mediaGallery"]', 
-                '[class*="user-media"]',
-                '[class*="userMedia"]',
-                '[class*="CustomerMedia"]',
-                '[class*="customerMedia"]',
-                '[class*="review-media-gallery"]',
-            ];
-            
-            let galleryEl = null;
-            for (const sel of gallerySelectors) {
-                galleryEl = document.querySelector(sel);
-                if (galleryEl) break;
-            }
-            
-            // Galeri bulunamadıysa "Kullanıcı fotoğraf" başlığını ara
-            if (!galleryEl) {
-                const allHeadings = document.querySelectorAll('h2, h3, h4, div, span');
-                for (const heading of allHeadings) {
-                    const text = (heading.innerText || '').trim();
-                    if (text.match(/kullanıcı\s*(fotoğraf|foto|medya)/i) || text.match(/müşteri\s*(fotoğraf|foto)/i)) {
-                        // Başlığın parent veya sibling container'ını al
-                        galleryEl = heading.parentElement;
-                        break;
-                    }
-                }
-            }
-            
-            if (galleryEl) {
-                // Galeri içindeki görselleri say
-                const galleryImgs = galleryEl.querySelectorAll('img');
-                const uniqueGallerySrcs = new Set();
-                galleryImgs.forEach(img => {
-                    const src = img.src || img.dataset?.src || '';
-                    if (src && !src.startsWith('data:') && !src.includes('avatar') && !src.includes('icon')) {
-                        // Küçük ikonları dışla
-                        const w = img.naturalWidth || img.width || 100;
-                        if (w >= 40) {
-                            uniqueGallerySrcs.add(src);
-                        }
-                    }
-                });
-                photoReviewsCount = uniqueGallerySrcs.size;
-            }
-        }
-        
-        // Yöntem C: Genel fallback — sayfadaki tüm yorum bölgesinde görsel ara
-        if (photoReviewsCount === 0) {
-            // Sayfadaki "yorum" veya "review" class'lı bölgelerdeki görselleri say
-            const reviewSections = document.querySelectorAll('[class*="review"] img, [class*="Review"] img, [class*="rvw"] img, [class*="comment"] img, [class*="Comment"] img');
-            const uniqueSrcs = new Set();
-            reviewSections.forEach(img => {
-                const src = img.src || '';
-                if (src && !src.includes('avatar') && !src.includes('star') && !src.includes('icon') && !src.includes('svg') && !src.startsWith('data:')) {
-                    const w = img.naturalWidth || img.width || 100;
-                    if (w >= 40) {
-                        uniqueSrcs.add(src);
-                    }
-                }
-            });
-            if (uniqueSrcs.size > 0) {
-                photoReviewsCount = uniqueSrcs.size;
-            }
         }
 
         // ========== MANTIK KONTROLÜ ==========
