@@ -312,26 +312,68 @@
         }
 
         // Hepsiburada'da "Yorum" yerine "Değerlendirme" kullanılıyor
-        // Eğer commentCount hâlâ 0 ise ve ratingsCount var ise, değerlendirme sayısını yorum sayısı olarak kullan
-        if (commentCount === 0 && isHepsiburada && ratingsCount > 0) {
-            commentCount = ratingsCount;
+        // Ancak bazı değerlendirmeler yorum metni içerMEZ (sadece yıldız)
+        if (commentCount === 0 && isHepsiburada) {
+            // Yöntem A: Filtre etiketlerinden "Yorumlu (X)" sayısını bul
+            const filterTags = document.querySelectorAll('[class*="FilterTag"], [class*="filterTag"], [class*="filter-tag"]');
+            for (const tag of filterTags) {
+                const text = (tag.innerText || '').trim();
+                const yorumluMatch = text.match(/[Yy]orumlu\s*\(?(\d[\d.]*)\)?/);
+                if (yorumluMatch) {
+                    commentCount = parseInt(yorumluMatch[1].replace(/\./g, ''));
+                    break;
+                }
+            }
+            // Yöntem B: Sayfadaki metinden "X yorum" ifadesini ara
+            if (commentCount === 0) {
+                const yorumMatch = bodyText.match(/(\d[\d.]*)\s*[Yy]orum(?!\s*yazın)/);
+                if (yorumMatch) {
+                    const val = parseInt(yorumMatch[1].replace(/\./g, ''));
+                    if (val > 0 && val <= ratingsCount) commentCount = val;
+                }
+            }
+            // Yöntem C: DOM'daki metin içeren yorum kartlarını say
+            if (commentCount === 0) {
+                commentCount = comments.filter(c => c !== '[Sadece Görsel]' && c.length > 5).length;
+            }
+            // Son çare: Eğer hâlâ 0 ise ve DOM'da yorum varsa, o sayıyı kullan
+            if (commentCount === 0 && ratingsCount > 0) {
+                commentCount = comments.length > 0 ? comments.length : ratingsCount;
+            }
         }
         
         // Fallback: commentCount bulunamadıysa, DOM'daki yorum adedini kullan
         if (commentCount === 0) commentCount = comments.length;
 
-        // ========== 7.5 FOTOĞRAFLI YORUM SAYISI (Metin Araması) ==========
+        // ========== 7.5 FOTOĞRAFLI YORUM SAYISI ==========
         let photoReviewsCount = 0;
-        const photoPatterns = [
-            /fotoğraflı\s*(?:yorum(?:lar)?|değerlendirme(?:ler)?)?\s*\(?(\d[\d.]*)\)?/i,
-            /(\d[\d.]*)\s*(?:adet\s*)?fotoğraflı/i,
-            /görsel(?:li)?\s*(?:yorum(?:lar)?)?\s*\(?(\d[\d.]*)\)?/i
-        ];
-        for (const pat of photoPatterns) {
-            const m = bodyText.match(pat);
-            if (m) {
-                photoReviewsCount = parseInt(m[1].replace(/\./g, ''));
-                break;
+        
+        // Yöntem 1 (En güvenilir): HB Filtre etiketlerinden "Fotoğraflı (X)" 
+        if (isHepsiburada) {
+            const filterTags = document.querySelectorAll('[class*="FilterTag"], [class*="filterTag"], [class*="filter-tag"]');
+            for (const tag of filterTags) {
+                const text = (tag.innerText || '').trim();
+                const fotoMatch = text.match(/[Ff]oto(?:ğ|g)rafl[ıi]\s*\(?(\d[\d.]*)\)?/);
+                if (fotoMatch) {
+                    photoReviewsCount = parseInt(fotoMatch[1].replace(/\./g, ''));
+                    break;
+                }
+            }
+        }
+        
+        // Yöntem 2: Sayfa metninden regex
+        if (photoReviewsCount === 0) {
+            const photoPatterns = [
+                /[Ff]oto(?:ğ|g)rafl[ıi]\s*\(?(\d[\d.]*)\)?/,
+                /(\d[\d.]*)\s*(?:adet\s*)?fotoğraflı/i,
+                /görsel(?:li)?\s*(?:yorum(?:lar)?)?\s*\(?(\d[\d.]*)\)?/i
+            ];
+            for (const pat of photoPatterns) {
+                const m = bodyText.match(pat);
+                if (m) {
+                    photoReviewsCount = parseInt(m[1].replace(/\./g, ''));
+                    break;
+                }
             }
         }
         
