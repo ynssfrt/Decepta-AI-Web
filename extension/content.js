@@ -346,14 +346,16 @@
                 const scripts = document.querySelectorAll('script');
                 for (let i = 0; i < scripts.length; i++) {
                     const txt = scripts[i].textContent || '';
-                    if (txt.includes('__HB_REVIEWS_INITIAL_STATE__') || txt.includes('totalReviewCount')) {
-                        const totalMatch = txt.match(/["']?totalReviewCount["']?\s*:\s*(\d+)/);
+                    // Sadece ana ürünün verilerini tutan özel script bloklarında arama yap
+                    // Sayfa 1'de __HB_REVIEWS_INITIAL_STATE__ kullanılırken, sayfa 3'te reduxStore veya HERMES kullanılıyor olabilir.
+                    if (txt.includes('__HB_REVIEWS_INITIAL_STATE__') || txt.includes('HERMES') || scripts[i].id === 'reduxStore' || txt.includes('reduxStore')) {
+                        const totalMatch = txt.match(/["']?(?:totalReviewCount|customerReviewCount|totalItemCount)["']?\s*:\s*(\d+)/);
                         if (totalMatch) {
                             commentCount = parseInt(totalMatch[1]);
                             hbSuccess = true;
                         }
                         
-                        const mediaMatch = txt.match(/["']?approvedMediaReviewCount["']?\s*:\s*(\d+)/);
+                        const mediaMatch = txt.match(/["']?(?:approvedMediaReviewCount|withMediaCount|photoReviewCount)["']?\s*:\s*(\d+)/);
                         if (mediaMatch) window.__hb_photoCount = parseInt(mediaMatch[1]);
                         
                         if (hbSuccess) break;
