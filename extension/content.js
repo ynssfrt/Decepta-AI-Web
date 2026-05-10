@@ -56,6 +56,25 @@
                     if (totals.length > 0) ratingsCount = parseInt(totals[0]);
                 }
                 
+                // Yorum ve Fotoğraflı Yorum Sayıları (NEXT_DATA'dan araması)
+                // HB API'si genelde reviewCount ve photoReviewCount (veya benzeri) kullanır
+                const yorumKeyleri = ['reviewCount', 'commentCount', 'approvedReviewCount'];
+                const fotoKeyleri = ['photoReviewCount', 'mediaCount', 'withMediaCount', 'imageReviewCount', 'customerMediaCount'];
+                
+                if (commentCount === 0) {
+                    for (const k of yorumKeyleri) {
+                        const vals = []; findAll(nd, k, vals, 0);
+                        if (vals.length > 0 && typeof vals[0] === 'number') { commentCount = vals[0]; break; }
+                    }
+                }
+                
+                let ndPhotoCountVal = 0;
+                for (const k of fotoKeyleri) {
+                    const vals = []; findAll(nd, k, vals, 0);
+                    if (vals.length > 0 && typeof vals[0] === 'number') { ndPhotoCountVal = vals[0]; break; }
+                }
+                if (ndPhotoCountVal > 0) window.__ndPhotoCount = ndPhotoCountVal;
+                
                 // Yorum metinleri ve görselleri (__NEXT_DATA__ içinden)
                 const reviewKeys = ['productReviews', 'reviews', 'userReviews'];
                 for (const key of reviewKeys) {
@@ -313,12 +332,38 @@
 
         // ========== HEPSİBURADA: YORUM SAYISI ==========
         if (commentCount === 0 && isHepsiburada) {
-            // bodyText'te "Yorumlu (X)" veya "Yorumlu X" formatını ara
-            const yorumluBody = bodyText.match(/[Yy]orumlu\s*\(?(\d[\d.]*)\)?/);
-            if (yorumluBody) {
-                commentCount = parseInt(yorumluBody[1].replace(/\./g, ''));
+            if (typeof window.__hb_commentCount !== 'undefined') {
+                commentCount = window.__hb_commentCount;
+            } else {
+                // Sayfadaki script'leri tarayıp __HB_REVIEWS_INITIAL_STATE__ içinden bulmayı dene
+                const scripts = document.querySelectorAll('script');
+                for (let i = 0; i < scripts.length; i++) {
+                    const txt = scripts[i].textContent || '';
+                    if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
+                        try {
+                            const m = txt.match(/window\.__HB_REVIEWS_INITIAL_STATE__\s*=\s*(\{.+?\});/);
+                            if (m) {
+                                const state = JSON.parse(m[1]);
+                                if (state?.reviews?.summary?.totalReviewCount) {
+                                    commentCount = parseInt(state.reviews.summary.totalReviewCount);
+                                }
+                                if (state?.reviews?.summary?.approvedMediaReviewCount) {
+                                    window.__hb_photoCount = parseInt(state.reviews.summary.approvedMediaReviewCount);
+                                }
+                            }
+                        } catch(e) {}
+                        break;
+                    }
+                }
             }
-            // DOM'daki ReviewCard'ların içinde metin olanları say
+            
+            // Eğer JSON'dan çekilemediyse fallback'e düş
+            if (commentCount === 0) {
+                const yorumluBody = bodyText.match(/[Yy]orumlu\s*\(?(\d[\d.]*)\)?/);
+                if (yorumluBody) {
+                    commentCount = parseInt(yorumluBody[1].replace(/\./g, ''));
+                }
+            }
             if (commentCount === 0) {
                 const reviewCards = document.querySelectorAll('[class*="ReviewCard-module"], [class*="hermes-ReviewCard"]');
                 let withText = 0;
@@ -341,9 +386,20 @@
 
         // ========== FOTOĞRAFLI YORUM SAYISI ==========
         let photoReviewsCount = 0;
+        // Yöntem 1: __NEXT_DATA__ içinden bulunduysa
+        if (typeof window.__ndPhotoCount !== 'undefined') {
+            photoReviewsCount = window.__ndPhotoCount;
+        }
         
-        // HB: bodyText'ten "Fotoğraflı (X)" veya "Fotoğraflı X" formatını ara
-        if (isHepsiburada) {
+        // HB: Script içerisinden okunduysa
+        if (photoReviewsCount === 0 && isHepsiburada) {
+            if (typeof window.__hb_photoCount !== 'undefined') {
+                photoReviewsCount = window.__hb_photoCount;
+            }
+        }
+        
+        // HB: bodyText'ten fallback
+        if (photoReviewsCount === 0 && isHepsiburada) {
             const fotoBody = bodyText.match(/[Ff]oto(?:ğ|g)rafl[ıi]\s*\(?(\d[\d.]*)\)?/);
             if (fotoBody) {
                 photoReviewsCount = parseInt(fotoBody[1].replace(/\./g, ''));
