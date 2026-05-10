@@ -365,9 +365,26 @@
             
             // Eğer asıl veritabanından çekilemediyse fallback'e düş
             if (!hbSuccess) {
-                const yorumluBody = bodyText.match(/[Yy]orumlu\s*\(?(\d[\d.]*)\)?/);
-                if (yorumluBody) {
-                    commentCount = parseInt(yorumluBody[1].replace(/\./g, ''));
+                // Diğer ürünlerin istatistiklerini almamak için sadece yorum bölgesini veya ana içeriği tara
+                let safeText = bodyText;
+                const reviewContainer = document.querySelector('[class*="ReviewList"], [class*="hermes-Review"], [id*="reviews"], [class*="Comments"]');
+                if (reviewContainer) {
+                    safeText = reviewContainer.innerText || '';
+                } else {
+                    const cutoff = safeText.search(/Benzer Ürünler|Önerilenler|Bunları da beğenebilirsiniz|Müşteriler bunları da aldı/i);
+                    if (cutoff > 0) safeText = safeText.substring(0, cutoff);
+                }
+                
+                const yorumPatterns = [
+                    /[Yy]orum(?:lu|lar)?\s*\(?(\d[\d.]*)\)?/,
+                    /(\d[\d.]*)\s*(?:Yorum|Değerlendirme)/i
+                ];
+                for (const pat of yorumPatterns) {
+                    const m = safeText.match(pat);
+                    if (m) {
+                        commentCount = parseInt(m[1].replace(/\./g, ''));
+                        break;
+                    }
                 }
                 
                 if (commentCount === 0) {
@@ -395,35 +412,52 @@
 
         // ========== FOTOĞRAFLI YORUM SAYISI ==========
         let photoReviewsCount = 0;
-        // Yöntem 1: __NEXT_DATA__ içinden bulunduysa
-        if (typeof window.__ndPhotoCount !== 'undefined') {
-            photoReviewsCount = window.__ndPhotoCount;
-        }
         
-        // HB: Script içerisinden okunduysa
-        if (photoReviewsCount === 0 && isHepsiburada) {
+        if (isHepsiburada) {
+            // HB: Script içerisinden okunduysa (NEXT_DATA'dan gelen veriyi yoksay)
             if (typeof window.__hb_photoCount !== 'undefined') {
                 photoReviewsCount = window.__hb_photoCount;
             }
-        }
-        
-        // HB: bodyText'ten fallback
-        if (photoReviewsCount === 0 && isHepsiburada) {
-            const fotoBody = bodyText.match(/[Ff]oto(?:ğ|g)rafl[ıi]\s*\(?(\d[\d.]*)\)?/);
-            if (fotoBody) {
-                photoReviewsCount = parseInt(fotoBody[1].replace(/\./g, ''));
+            
+            // HB: bodyText'ten fallback
+            if (photoReviewsCount === 0) {
+                let safeText = bodyText;
+                const reviewContainer = document.querySelector('[class*="ReviewList"], [class*="hermes-Review"], [id*="reviews"], [class*="Comments"]');
+                if (reviewContainer) {
+                    safeText = reviewContainer.innerText || '';
+                } else {
+                    const cutoff = safeText.search(/Benzer Ürünler|Önerilenler|Bunları da beğenebilirsiniz|Müşteriler bunları da aldı/i);
+                    if (cutoff > 0) safeText = safeText.substring(0, cutoff);
+                }
+                
+                const fotoPatterns = [
+                    /[Ff]oto(?:ğ|g)rafl[ıi]\s*(?:Yorum(?:lar)?\s*)?\(?(\d[\d.]*)\)?/,
+                    /(\d[\d.]*)\s*(?:adet\s*)?fotoğraflı/i
+                ];
+                for (const pat of fotoPatterns) {
+                    const m = safeText.match(pat);
+                    if (m) {
+                        photoReviewsCount = parseInt(m[1].replace(/\./g, ''));
+                        break;
+                    }
+                }
             }
-        }
-        
-        // Trendyol + genel fallback
-        if (photoReviewsCount === 0 && !isHepsiburada) {
-            const photoPatterns = [
-                /[Ff]oto(?:ğ|g)rafl[ıi]\s*\(?(\d[\d.]*)\)?/,
-                /(\d[\d.]*)\s*(?:adet\s*)?fotoğraflı/i,
-            ];
-            for (const pat of photoPatterns) {
-                const m = bodyText.match(pat);
-                if (m) { photoReviewsCount = parseInt(m[1].replace(/\./g, '')); break; }
+        } else {
+            // Yöntem 1: __NEXT_DATA__ içinden bulunduysa (Sadece Trendyol vb. için)
+            if (typeof window.__ndPhotoCount !== 'undefined') {
+                photoReviewsCount = window.__ndPhotoCount;
+            }
+            
+            // Trendyol + genel fallback
+            if (photoReviewsCount === 0) {
+                const photoPatterns = [
+                    /[Ff]oto(?:ğ|g)rafl[ıi]\s*\(?(\d[\d.]*)\)?/,
+                    /(\d[\d.]*)\s*(?:adet\s*)?fotoğraflı/i,
+                ];
+                for (const pat of photoPatterns) {
+                    const m = bodyText.match(pat);
+                    if (m) { photoReviewsCount = parseInt(m[1].replace(/\./g, '')); break; }
+                }
             }
         }
         
