@@ -335,56 +335,19 @@
             if (typeof window.__hb_commentCount !== 'undefined') {
                 commentCount = window.__hb_commentCount;
             } else {
-                // YÖNTEM 1: Ana sayfanın window objesine ulaşmak için DOM'a geçici script enjekte et
-                // Content Script'ler izole bir ortamda (isolated world) çalıştığı için doğrudan window'a erişemezler.
-                const scriptId = 'decepta-hb-state-reader';
-                if (!document.getElementById(scriptId)) {
-                    const s = document.createElement('script');
-                    s.id = scriptId;
-                    s.textContent = `
-                        (function() {
-                            try {
-                                if (window.__HB_REVIEWS_INITIAL_STATE__) {
-                                    var state = window.__HB_REVIEWS_INITIAL_STATE__;
-                                    var cCount = 0;
-                                    var pCount = 0;
-                                    if (state.productReviews) {
-                                        cCount = state.productReviews.totalReviewCount;
-                                        pCount = state.productReviews.approvedMediaReviewCount;
-                                    } else if (state.reviews && state.reviews.summary) {
-                                        cCount = state.reviews.summary.totalReviewCount;
-                                        pCount = state.reviews.summary.approvedMediaReviewCount;
-                                    }
-                                    if (cCount) document.body.setAttribute('data-decepta-hb-comments', cCount);
-                                    if (pCount) document.body.setAttribute('data-decepta-hb-photos', pCount);
-                                }
-                            } catch(e) {}
-                        })();
-                    `;
-                    document.documentElement.appendChild(s);
-                    s.remove(); // Senkron çalıştığı için hemen silebiliriz
-                }
-                
-                const cVal = document.body.getAttribute('data-decepta-hb-comments');
-                const pVal = document.body.getAttribute('data-decepta-hb-photos');
-                if (cVal) commentCount = parseInt(cVal);
-                if (pVal) window.__hb_photoCount = parseInt(pVal);
-                
-                // YÖNTEM 2: Hepsiburada performanstan dolayı sayfa yüklendikten sonra window objesini siliyorsa,
-                // sayfadaki <script> tag'inin orijinal metni (DOM) üzerinden veriyi oku.
-                if (commentCount === 0) {
-                    const scripts = document.querySelectorAll('script');
-                    for (let i = 0; i < scripts.length; i++) {
-                        const txt = scripts[i].textContent || '';
-                        if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
-                            const totalMatch = txt.match(/"totalReviewCount"\s*:\s*(\d+)/);
-                            if (totalMatch) commentCount = parseInt(totalMatch[1]);
-                            
-                            const mediaMatch = txt.match(/"approvedMediaReviewCount"\s*:\s*(\d+)/);
-                            if (mediaMatch) window.__hb_photoCount = parseInt(mediaMatch[1]);
-                            
-                            if (commentCount > 0) break;
-                        }
+                // YÖNTEM 1: Sayfadaki <script> tag'lerinin orijinal metni (DOM) üzerinden veriyi oku.
+                // Bu yöntem CSP (Content Security Policy) hatası vermez ve sayfa window objesini silse bile çalışır.
+                const scripts = document.querySelectorAll('script');
+                for (let i = 0; i < scripts.length; i++) {
+                    const txt = scripts[i].textContent || '';
+                    if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
+                        const totalMatch = txt.match(/"totalReviewCount"\s*:\s*(\d+)/);
+                        if (totalMatch) commentCount = parseInt(totalMatch[1]);
+                        
+                        const mediaMatch = txt.match(/"approvedMediaReviewCount"\s*:\s*(\d+)/);
+                        if (mediaMatch) window.__hb_photoCount = parseInt(mediaMatch[1]);
+                        
+                        if (commentCount > 0) break;
                     }
                 }
             }
