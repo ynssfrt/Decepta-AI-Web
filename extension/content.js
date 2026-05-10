@@ -336,63 +336,67 @@
             let hbSuccess = false;
             let hbPhotoFound = false;
             
-            // Hepsiburada'nın "totalReviewCount" değeri Değerlendirme sayısıdır (52), Yorum sayısı (26) DEĞİLDİR!
-            // Gerçek yorum sayısı sayfadaki "Yorumlu (26)" tab etiketinde gizlidir.
-            
-            // ======= YÖNTEM 0: bodyText'te spesifik tab etiketlerini ara (EN GÜVENİLİR) =======
-            // "Yorumlu (26)" — bu kalıp sayfada yalnızca yorum filtre tab'ında bulunur
+            // ======= YÖNTEM 0: bodyText'te spesifik tab etiketlerini ara =======
             const yorumluMatch = bodyText.match(/Yorumlu\s*\((\d[\d.]*)\)/);
             if (yorumluMatch) {
                 commentCount = parseInt(yorumluMatch[1].replace(/\./g, ''));
                 hbSuccess = true;
             }
             
-            // "Fotoğraflı (4)" — bu kalıp sayfada yalnızca fotoğraf filtre tab'ında bulunur
             const fotoluMatch = bodyText.match(/Foto(?:ğ|g)rafl[ıi]\s*\((\d[\d.]*)\)/);
             if (fotoluMatch) {
                 window.__hb_photoCount = parseInt(fotoluMatch[1].replace(/\./g, ''));
                 hbPhotoFound = true;
             }
             
-            // ======= YÖNTEM 1: window objesi (Hepsiburada bazen bunu set eder) =======
+            // ======= YÖNTEM 1: window objesi =======
             if (!hbSuccess && typeof window.__hb_commentCount !== 'undefined') {
                 commentCount = window.__hb_commentCount;
                 hbSuccess = true;
             }
             
-            // ======= YÖNTEM 2: Script bloğundan spesifik anahtarları çek =======
-            if (!hbSuccess || !hbPhotoFound) {
-                const scripts = document.querySelectorAll('script');
-                for (let i = 0; i < scripts.length; i++) {
-                    const txt = scripts[i].textContent || '';
-                    if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
-                        const stateIndex = txt.indexOf('__HB_REVIEWS_INITIAL_STATE__');
-                        const stateTxt = txt.substring(stateIndex);
-                        
-                        if (!hbSuccess) {
-                            // "commentCount" veya "approvedCommentCount" — bunlar yazılı yorum sayısıdır
-                            const commentMatch = stateTxt.match(/"(?:commentCount|approvedCommentCount|approvedReviewCount|textReviewCount|writtenReviewCount)"\s*:\s*(\d+)/);
-                            if (commentMatch) {
-                                commentCount = parseInt(commentMatch[1]);
+            // ======= YÖNTEM 2: Script bloğu (HER ZAMAN fotoğraf için çalışır) =======
+            // NOT: Script'teki totalReviewCount = Değerlendirme sayısıdır (52).
+            //       Yazılı yorum sayısı (26) için ayrı anahtar YOK.
+            //       approvedMediaReviewCount = Fotoğraflı yorum sayısı (4) — BU VAR!
+            const scripts = document.querySelectorAll('script');
+            for (let i = 0; i < scripts.length; i++) {
+                const txt = scripts[i].textContent || '';
+                if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
+                    const stateIndex = txt.indexOf('__HB_REVIEWS_INITIAL_STATE__');
+                    const stateTxt = txt.substring(stateIndex);
+                    
+                    // Fotoğraf sayısını al (approvedMediaReviewCount veya totalPhotoCount)
+                    if (!hbPhotoFound) {
+                        const mediaMatch = stateTxt.match(/"(?:approvedMediaReviewCount|totalPhotoCount|mediaCount|withMediaCount|photoReviewCount)"\s*:\s*(\d+)/);
+                        if (mediaMatch) {
+                            window.__hb_photoCount = parseInt(mediaMatch[1]);
+                            hbPhotoFound = true;
+                        }
+                    }
+                    
+                    // Yorum sayısını al (commentCount varsa onu kullan, yoksa totalReviewCount)
+                    if (!hbSuccess) {
+                        // Önce spesifik commentCount anahtarını dene (bazı sayfalarda var)
+                        const commentMatch = stateTxt.match(/"(?:commentCount|approvedCommentCount|textReviewCount|writtenReviewCount)"\s*:\s*(\d+)/);
+                        if (commentMatch) {
+                            commentCount = parseInt(commentMatch[1]);
+                            hbSuccess = true;
+                        } else {
+                            // Yoksa totalReviewCount'u (değerlendirme) al — HB'de tek mevcut sayı bu
+                            const totalMatch = stateTxt.match(/"totalReviewCount"\s*:\s*(\d+)/);
+                            if (totalMatch) {
+                                commentCount = parseInt(totalMatch[1]);
                                 hbSuccess = true;
                             }
                         }
-                        
-                        if (!hbPhotoFound) {
-                            const mediaMatch = stateTxt.match(/"(?:approvedMediaReviewCount|totalPhotoCount|mediaCount|withMediaCount|photoReviewCount|mediaReviewCount)"\s*:\s*(\d+)/);
-                            if (mediaMatch) {
-                                window.__hb_photoCount = parseInt(mediaMatch[1]);
-                                hbPhotoFound = true;
-                            }
-                        }
-                        
-                        break;
                     }
+                    
+                    break;
                 }
             }
             
             // ======= YÖNTEM 3: "(52 Değerlendirme)" metninden son çare =======
-            // DİKKAT: Bu değerlendirme sayısıdır, yorum sayısı değildir. Ama hiç veri yoksa bunu kullan.
             if (!hbSuccess) {
                 const evalMatch = bodyText.match(/\((\d[\d.]*)\s*[Dd]eğerlendirme\)/);
                 if (evalMatch) {
