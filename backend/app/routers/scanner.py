@@ -107,6 +107,10 @@ async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer, htm
                     is_suspicious = True
                     reasons.append("Anlamsız ve aşırı uzun harf dizilimi içeriyor")
                 
+                # Dummy mod veya hata durumlarında bot tespiti yapma
+                if sentiment_result["label"] in ("UNKNOWN", "ERROR", "NEUTRAL"):
+                    continue
+                
                 if complexity["word_count"] < 3 and sentiment_result["label"] == "POSITIVE" and sentiment_result["score"] > 0.95:
                     is_suspicious = True
                     reasons.append("Aşırı kısa ama kesin pozitif (Spam bot paterni)")
