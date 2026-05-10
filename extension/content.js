@@ -412,6 +412,13 @@
             }
         }
 
+        // ========== MANTIK KONTROLÜ ==========
+        // Fotoğraflı yorum sayısı, toplam yorum veya değerlendirme sayısından fazla olamaz
+        const maxReasonable = Math.max(commentCount, ratingsCount);
+        if (maxReasonable > 0 && photoReviewsCount > maxReasonable) {
+            photoReviewsCount = Math.min(photoReviewsCount, maxReasonable);
+        }
+
         // ========== SONUÇ ==========
         if (!debug_source) debug_source = 'BULUNAMADI';
         const result = {

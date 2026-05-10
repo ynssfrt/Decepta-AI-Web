@@ -49,6 +49,59 @@ document.getElementById('scan-btn').addEventListener('click', async () => {
                 // Maximum 15 saniye bekle
                 setTimeout(() => { clearInterval(checkLoaded); resolve(); }, 15000);
             });
+        } else if (targetUrl.includes('hepsiburada.com')) {
+            // Hepsiburada: Yorumlar sekmesine tıkla ve içeriğin yüklenmesini bekle
+            await chrome.scripting.executeScript({
+                target: { tabId: tab.id },
+                func: () => {
+                    // Değerlendirmeler / Yorumlar sekmesini bul ve tıkla
+                    const tabSelectors = [
+                        '[class*="tab"][class*="review"]',
+                        '[class*="tab"][class*="Review"]',
+                        '[class*="hermes-Tab"]',
+                        '[data-test-id*="review"]',
+                        'a[href*="#reviews"]',
+                        'a[href*="#comments"]',
+                    ];
+                    let clicked = false;
+                    
+                    // Önce tab seçicilerinden tıkla
+                    for (const sel of tabSelectors) {
+                        const el = document.querySelector(sel);
+                        if (el) { el.click(); clicked = true; break; }
+                    }
+                    
+                    // Seçiciler bulunamazsa, metin arayarak tıkla
+                    if (!clicked) {
+                        const allTabs = document.querySelectorAll('[role="tab"], [class*="Tab"], [class*="tab"], button, a');
+                        for (const tab of allTabs) {
+                            const text = (tab.innerText || '').trim().toLowerCase();
+                            if (text.includes('değerlendirme') || text.includes('yorum') || text.includes('review')) {
+                                tab.click();
+                                clicked = true;
+                                break;
+                            }
+                        }
+                    }
+                    
+                    // Yorum bölümüne scroll et
+                    if (clicked) {
+                        const reviewSections = document.querySelectorAll('[class*="review"], [class*="Review"], [id*="review"], [id*="comment"]');
+                        for (const sec of reviewSections) {
+                            if (sec.offsetHeight > 100) {
+                                sec.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                                break;
+                            }
+                        }
+                    } else {
+                        // Tab bulunamadı, sayfayı aşağı scroll et
+                        window.scrollTo(0, document.body.scrollHeight * 0.6);
+                    }
+                }
+            });
+            
+            // Yorumların yüklenmesi için bekle (AJAX + render)
+            await new Promise(r => setTimeout(r, 4000));
         } else {
             // Zaten yorumlar sayfasındayız veya başka site, kısa bekle
             await new Promise(r => setTimeout(r, 1000));
