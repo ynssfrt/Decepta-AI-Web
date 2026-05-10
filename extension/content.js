@@ -332,96 +332,72 @@
 
         // ========== HEPSİBURADA: YORUM SAYISI ==========
         if (isHepsiburada) {
-            // __NEXT_DATA__'dan yanlışlıkla gelen diğer ürünlerin sayısını (örn. 29) yoksay ve sıfırla.
-            // Çünkü Hepsiburada'da asıl veriler __HB_REVIEWS_INITIAL_STATE__ içindedir.
             commentCount = 0;
             let hbSuccess = false;
+            let hbPhotoFound = false;
             
-            if (typeof window.__hb_commentCount !== 'undefined') {
+            // Hepsiburada'nın "totalReviewCount" değeri Değerlendirme sayısıdır (52), Yorum sayısı (26) DEĞİLDİR!
+            // Gerçek yorum sayısı sayfadaki "Yorumlu (26)" tab etiketinde gizlidir.
+            
+            // ======= YÖNTEM 0: bodyText'te spesifik tab etiketlerini ara (EN GÜVENİLİR) =======
+            // "Yorumlu (26)" — bu kalıp sayfada yalnızca yorum filtre tab'ında bulunur
+            const yorumluMatch = bodyText.match(/Yorumlu\s*\((\d[\d.]*)\)/);
+            if (yorumluMatch) {
+                commentCount = parseInt(yorumluMatch[1].replace(/\./g, ''));
+                hbSuccess = true;
+            }
+            
+            // "Fotoğraflı (4)" — bu kalıp sayfada yalnızca fotoğraf filtre tab'ında bulunur
+            const fotoluMatch = bodyText.match(/Foto(?:ğ|g)rafl[ıi]\s*\((\d[\d.]*)\)/);
+            if (fotoluMatch) {
+                window.__hb_photoCount = parseInt(fotoluMatch[1].replace(/\./g, ''));
+                hbPhotoFound = true;
+            }
+            
+            // ======= YÖNTEM 1: window objesi (Hepsiburada bazen bunu set eder) =======
+            if (!hbSuccess && typeof window.__hb_commentCount !== 'undefined') {
                 commentCount = window.__hb_commentCount;
                 hbSuccess = true;
             }
             
-            if (!hbSuccess) {
-                // YÖNTEM 1: Sayfadaki tüm buton/tab/span elementlerinden sayıları çek
-                let cutoff = bodyText.search(/Benzer Ürünler|Önerilenler|Bunları da beğenebilirsiniz|Müşteriler bunları da aldı/i);
-                if (cutoff === -1) cutoff = bodyText.length;
-                
-                const filterElements = document.querySelectorAll('button, a, span, div[class*="Filter"], div[class*="filter"], div[class*="Tab"], div[class*="tab"]');
-                let foundYorum = false;
-                let foundFoto = false;
-                
-                filterElements.forEach(el => {
-                    const text = (el.innerText || '').trim();
-                    if (text.length > 3 && text.length < 50 && bodyText.indexOf(text) < cutoff) {
-                        if (!foundYorum) {
-                            // "Yorumlu (26)" veya "26 Yorum" veya "Yorumlar (26)"
-                            const m = text.match(/[Yy]orum(?:lu|lar)?\s*\(?(\d[\d.]*)\)?/) || text.match(/(\d[\d.]*)\s*[Yy]orum/i);
-                            if (m) { commentCount = parseInt(m[1].replace(/\./g, '')); foundYorum = true; hbSuccess = true; }
-                        }
-                        if (!foundFoto) {
-                            // "Fotoğraflı (4)" veya "4 Fotoğraflı"
-                            const m = text.match(/[Ff]oto(?:ğ|g)rafl[ıi]\s*(?:[Yy]orum(?:lar)?\s*)?\(?(\d[\d.]*)\)?/) || text.match(/(\d[\d.]*)\s*(?:adet\s*)?[Ff]oto(?:ğ|g)rafl[ıi]/i);
-                            if (m) { window.__hb_photoCount = parseInt(m[1].replace(/\./g, '')); foundFoto = true; }
-                        }
-                    }
-                });
-                
-                // YÖNTEM 2: Script tag'lerinden JSON verisini çek
-                if (!hbSuccess || !foundFoto) {
-                    const scripts = document.querySelectorAll('script');
-                    for (let i = 0; i < scripts.length; i++) {
-                        const txt = scripts[i].textContent || '';
-                        if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
-                            const stateIndex = txt.indexOf('__HB_REVIEWS_INITIAL_STATE__');
-                            const stateTxt = txt.substring(stateIndex);
-                            
-                            if (!hbSuccess) {
-                                // Önce productReviews bloğunu dene
-                                const prIndex = stateTxt.indexOf('"productReviews"');
-                                if (prIndex > -1) {
-                                    const prBlock = stateTxt.substring(prIndex, prIndex + 2000);
-                                    const totalMatch = prBlock.match(/"totalReviewCount"\s*:\s*(\d+)/);
-                                    if (totalMatch) {
-                                        commentCount = parseInt(totalMatch[1]);
-                                        hbSuccess = true;
-                                    }
-                                }
-                                
-                                // productReviews yoksa veya totalReviewCount yoksa, tüm state'ten dene
-                                if (!hbSuccess) {
-                                    // reviewCount veya totalReviewCount'u herhangi bir yerde bul
-                                    const anyReview = stateTxt.match(/"(?:totalReviewCount|reviewCount|customerReviewCount|totalItemCount)"\s*:\s*(\d+)/);
-                                    if (anyReview) {
-                                        commentCount = parseInt(anyReview[1]);
-                                        hbSuccess = true;
-                                    }
-                                }
+            // ======= YÖNTEM 2: Script bloğundan spesifik anahtarları çek =======
+            if (!hbSuccess || !hbPhotoFound) {
+                const scripts = document.querySelectorAll('script');
+                for (let i = 0; i < scripts.length; i++) {
+                    const txt = scripts[i].textContent || '';
+                    if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
+                        const stateIndex = txt.indexOf('__HB_REVIEWS_INITIAL_STATE__');
+                        const stateTxt = txt.substring(stateIndex);
+                        
+                        if (!hbSuccess) {
+                            // "commentCount" veya "approvedCommentCount" — bunlar yazılı yorum sayısıdır
+                            const commentMatch = stateTxt.match(/"(?:commentCount|approvedCommentCount|approvedReviewCount|textReviewCount|writtenReviewCount)"\s*:\s*(\d+)/);
+                            if (commentMatch) {
+                                commentCount = parseInt(commentMatch[1]);
+                                hbSuccess = true;
                             }
-                            
-                            // Fotoğraf sayısı
-                            if (!foundFoto) {
-                                // productReviews bloğundan veya genel state'ten
-                                const mediaMatch = stateTxt.match(/"(?:approvedMediaReviewCount|totalPhotoCount|mediaCount|withMediaCount|photoReviewCount|mediaReviewCount)"\s*:\s*(\d+)/);
-                                if (mediaMatch) {
-                                    window.__hb_photoCount = parseInt(mediaMatch[1]);
-                                    foundFoto = true;
-                                }
-                            }
-                            
-                            break; // İlk bulunan __HB_REVIEWS_INITIAL_STATE__ yeterli
                         }
+                        
+                        if (!hbPhotoFound) {
+                            const mediaMatch = stateTxt.match(/"(?:approvedMediaReviewCount|totalPhotoCount|mediaCount|withMediaCount|photoReviewCount|mediaReviewCount)"\s*:\s*(\d+)/);
+                            if (mediaMatch) {
+                                window.__hb_photoCount = parseInt(mediaMatch[1]);
+                                hbPhotoFound = true;
+                            }
+                        }
+                        
+                        break;
                     }
                 }
-                
-                // YÖNTEM 3: Script'te de bulunamadıysa, sayfanın üstündeki "(52 Değerlendirme)" metninden al
-                if (!hbSuccess) {
-                    // Sayfada genellikle "(52 Değerlendirme)" şeklinde yazar
-                    const evalMatch = bodyText.match(/\((\d[\d.]*)\s*[Dd]eğerlendirme\)/);
-                    if (evalMatch) {
-                        commentCount = parseInt(evalMatch[1].replace(/\./g, ''));
-                        hbSuccess = true;
-                    }
+            }
+            
+            // ======= YÖNTEM 3: "(52 Değerlendirme)" metninden son çare =======
+            // DİKKAT: Bu değerlendirme sayısıdır, yorum sayısı değildir. Ama hiç veri yoksa bunu kullan.
+            if (!hbSuccess) {
+                const evalMatch = bodyText.match(/\((\d[\d.]*)\s*[Dd]eğerlendirme\)/);
+                if (evalMatch) {
+                    commentCount = parseInt(evalMatch[1].replace(/\./g, ''));
+                    hbSuccess = true;
                 }
             }
         }
