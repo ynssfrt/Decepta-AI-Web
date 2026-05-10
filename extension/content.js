@@ -343,7 +343,7 @@
             }
             
             if (!hbSuccess) {
-                // YÖNTEM 1: Arayüzdeki filtre butonları (Kesin ve görünür sayılar)
+                // YÖNTEM 1: Sayfadaki tüm buton/tab/span elementlerinden sayıları çek
                 let cutoff = bodyText.search(/Benzer Ürünler|Önerilenler|Bunları da beğenebilirsiniz|Müşteriler bunları da aldı/i);
                 if (cutoff === -1) cutoff = bodyText.length;
                 
@@ -353,63 +353,76 @@
                 
                 filterElements.forEach(el => {
                     const text = (el.innerText || '').trim();
-                    if (text.length > 5 && text.length < 40 && bodyText.indexOf(text) < cutoff) {
+                    if (text.length > 3 && text.length < 50 && bodyText.indexOf(text) < cutoff) {
                         if (!foundYorum) {
-                            const m = text.match(/[Yy]orum(?:lu|lar)?\s*\(?(\d[\d.]*)\)?/);
+                            // "Yorumlu (26)" veya "26 Yorum" veya "Yorumlar (26)"
+                            const m = text.match(/[Yy]orum(?:lu|lar)?\s*\(?(\d[\d.]*)\)?/) || text.match(/(\d[\d.]*)\s*[Yy]orum/i);
                             if (m) { commentCount = parseInt(m[1].replace(/\./g, '')); foundYorum = true; hbSuccess = true; }
-                            else {
-                                const m2 = text.match(/(\d[\d.]*)\s*[Yy]orum/i);
-                                if (m2) { commentCount = parseInt(m2[1].replace(/\./g, '')); foundYorum = true; hbSuccess = true; }
-                            }
                         }
                         if (!foundFoto) {
-                            const m = text.match(/[Ff]oto(?:ğ|g)rafl[ıi]\s*(?:Yorum(?:lar)?\s*)?\(?(\d[\d.]*)\)?/);
+                            // "Fotoğraflı (4)" veya "4 Fotoğraflı"
+                            const m = text.match(/[Ff]oto(?:ğ|g)rafl[ıi]\s*(?:[Yy]orum(?:lar)?\s*)?\(?(\d[\d.]*)\)?/) || text.match(/(\d[\d.]*)\s*(?:adet\s*)?[Ff]oto(?:ğ|g)rafl[ıi]/i);
                             if (m) { window.__hb_photoCount = parseInt(m[1].replace(/\./g, '')); foundFoto = true; }
-                            else {
-                                const m2 = text.match(/(\d[\d.]*)\s*(?:adet\s*)?fotoğraflı/i);
-                                if (m2) { window.__hb_photoCount = parseInt(m2[1].replace(/\./g, '')); foundFoto = true; }
-                            }
                         }
                     }
                 });
                 
-                // YÖNTEM 2: Eğer DOM'da bulunamadıysa Script Tag JSON'ından çek (Fallback)
-                if (!hbSuccess) {
+                // YÖNTEM 2: Script tag'lerinden JSON verisini çek
+                if (!hbSuccess || !foundFoto) {
                     const scripts = document.querySelectorAll('script');
                     for (let i = 0; i < scripts.length; i++) {
                         const txt = scripts[i].textContent || '';
                         if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
                             const stateIndex = txt.indexOf('__HB_REVIEWS_INITIAL_STATE__');
-                            const relevantTxt = txt.substring(stateIndex);
+                            const stateTxt = txt.substring(stateIndex);
                             
-                            // ratingSummary (52) ile productReviews (26) karışmaması için doğrudan productReviews bloğunu hedefle
-                            const prIndex = relevantTxt.indexOf('"productReviews"');
-                            if (prIndex > -1) {
-                                const prBlock = relevantTxt.substring(prIndex);
-                                
-                                const totalMatch = prBlock.match(/"totalReviewCount"\s*:\s*(\d+)/);
-                                if (totalMatch) {
-                                    commentCount = parseInt(totalMatch[1]);
-                                    hbSuccess = true;
+                            if (!hbSuccess) {
+                                // Önce productReviews bloğunu dene
+                                const prIndex = stateTxt.indexOf('"productReviews"');
+                                if (prIndex > -1) {
+                                    const prBlock = stateTxt.substring(prIndex, prIndex + 2000);
+                                    const totalMatch = prBlock.match(/"totalReviewCount"\s*:\s*(\d+)/);
+                                    if (totalMatch) {
+                                        commentCount = parseInt(totalMatch[1]);
+                                        hbSuccess = true;
+                                    }
                                 }
                                 
-                                if (!foundFoto) {
-                                    const mediaMatch = prBlock.match(/"approvedMediaReviewCount"\s*:\s*(\d+)/);
-                                    if (mediaMatch) {
-                                        window.__hb_photoCount = parseInt(mediaMatch[1]);
+                                // productReviews yoksa veya totalReviewCount yoksa, tüm state'ten dene
+                                if (!hbSuccess) {
+                                    // reviewCount veya totalReviewCount'u herhangi bir yerde bul
+                                    const anyReview = stateTxt.match(/"(?:totalReviewCount|reviewCount|customerReviewCount|totalItemCount)"\s*:\s*(\d+)/);
+                                    if (anyReview) {
+                                        commentCount = parseInt(anyReview[1]);
+                                        hbSuccess = true;
                                     }
                                 }
                             }
                             
-                            if (hbSuccess) break;
+                            // Fotoğraf sayısı
+                            if (!foundFoto) {
+                                // productReviews bloğundan veya genel state'ten
+                                const mediaMatch = stateTxt.match(/"(?:approvedMediaReviewCount|totalPhotoCount|mediaCount|withMediaCount|photoReviewCount|mediaReviewCount)"\s*:\s*(\d+)/);
+                                if (mediaMatch) {
+                                    window.__hb_photoCount = parseInt(mediaMatch[1]);
+                                    foundFoto = true;
+                                }
+                            }
+                            
+                            break; // İlk bulunan __HB_REVIEWS_INITIAL_STATE__ yeterli
                         }
                     }
                 }
                 
-                // HEPSİBURADA İÇİN FALLBACK YOK!
-                // DOM'daki yorum kartlarını veya görselleri saymak,
-                // sayfa/scroll değiştikçe farklı sonuç vereceği için yapılmıyor.
-                // Eğer Yöntem 1 ve 2 bulamazsa commentCount = 0 kalacak.
+                // YÖNTEM 3: Script'te de bulunamadıysa, sayfanın üstündeki "(52 Değerlendirme)" metninden al
+                if (!hbSuccess) {
+                    // Sayfada genellikle "(52 Değerlendirme)" şeklinde yazar
+                    const evalMatch = bodyText.match(/\((\d[\d.]*)\s*[Dd]eğerlendirme\)/);
+                    if (evalMatch) {
+                        commentCount = parseInt(evalMatch[1].replace(/\./g, ''));
+                        hbSuccess = true;
+                    }
+                }
             }
         }
         
