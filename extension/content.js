@@ -335,23 +335,40 @@
             if (typeof window.__hb_commentCount !== 'undefined') {
                 commentCount = window.__hb_commentCount;
             } else {
-                // YÖNTEM 1: Sadece __HB_REVIEWS_INITIAL_STATE__ bloğu içinde regex ile ara
-                // Bu yöntem JSON parse hatalarını aşar ve sayfadaki "Benzer Ürünler" gibi
-                // diğer ürünlerin yorum sayılarıyla karışmasını engeller.
-                const html = document.documentElement.outerHTML || '';
-                const stateMatch = html.match(/window\.__HB_REVIEWS_INITIAL_STATE__\s*=\s*([\s\S]+?)<\/script>/);
-                
-                if (stateMatch) {
-                    const stateStr = stateMatch[1];
-                    const totalMatch = stateStr.match(/"totalReviewCount"\s*:\s*(\d+)/);
-                    if (totalMatch) {
-                        commentCount = parseInt(totalMatch[1]);
-                    }
-                    const mediaMatch = stateStr.match(/"approvedMediaReviewCount"\s*:\s*(\d+)/);
-                    if (mediaMatch) {
-                        window.__hb_photoCount = parseInt(mediaMatch[1]);
-                    }
+                // YÖNTEM 1: Ana sayfanın window objesine ulaşmak için DOM'a geçici script enjekte et
+                // Content Script'ler izole bir ortamda (isolated world) çalıştığı için doğrudan window'a erişemezler.
+                const scriptId = 'decepta-hb-state-reader';
+                if (!document.getElementById(scriptId)) {
+                    const s = document.createElement('script');
+                    s.id = scriptId;
+                    s.textContent = `
+                        (function() {
+                            try {
+                                if (window.__HB_REVIEWS_INITIAL_STATE__) {
+                                    var state = window.__HB_REVIEWS_INITIAL_STATE__;
+                                    var cCount = 0;
+                                    var pCount = 0;
+                                    if (state.productReviews) {
+                                        cCount = state.productReviews.totalReviewCount;
+                                        pCount = state.productReviews.approvedMediaReviewCount;
+                                    } else if (state.reviews && state.reviews.summary) {
+                                        cCount = state.reviews.summary.totalReviewCount;
+                                        pCount = state.reviews.summary.approvedMediaReviewCount;
+                                    }
+                                    if (cCount) document.body.setAttribute('data-decepta-hb-comments', cCount);
+                                    if (pCount) document.body.setAttribute('data-decepta-hb-photos', pCount);
+                                }
+                            } catch(e) {}
+                        })();
+                    `;
+                    document.documentElement.appendChild(s);
+                    s.remove(); // Senkron çalıştığı için hemen silebiliriz
                 }
+                
+                const cVal = document.body.getAttribute('data-decepta-hb-comments');
+                const pVal = document.body.getAttribute('data-decepta-hb-photos');
+                if (cVal) commentCount = parseInt(cVal);
+                if (pVal) window.__hb_photoCount = parseInt(pVal);
             }
             
             // Eğer JSON'dan çekilemediyse fallback'e düş
