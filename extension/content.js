@@ -320,11 +320,25 @@
         // Fallback: commentCount bulunamadıysa, DOM'daki yorum adedini kullan
         if (commentCount === 0) commentCount = comments.length;
 
-        // ========== 8. FOTOĞRAFLI YORUM SAYISI ==========
+        // ========== 7.5 FOTOĞRAFLI YORUM SAYISI (Metin Araması) ==========
         let photoReviewsCount = 0;
+        const photoPatterns = [
+            /fotoğraflı\s*(?:yorum(?:lar)?|değerlendirme(?:ler)?)?\s*\(?(\d[\d.]*)\)?/i,
+            /(\d[\d.]*)\s*(?:adet\s*)?fotoğraflı/i,
+            /görsel(?:li)?\s*(?:yorum(?:lar)?)?\s*\(?(\d[\d.]*)\)?/i
+        ];
+        for (const pat of photoPatterns) {
+            const m = bodyText.match(pat);
+            if (m) {
+                photoReviewsCount = parseInt(m[1].replace(/\./g, ''));
+                break;
+            }
+        }
         
         // Yöntem A: detailedReviews içinden (Trendyol kart içi görseller)
-        photoReviewsCount = detailedReviews.filter(r => r.images && r.images.length > 0).length;
+        if (photoReviewsCount === 0) {
+            photoReviewsCount = detailedReviews.filter(r => r.images && r.images.length > 0).length;
+        }
         
         // Yöntem B: Hepsiburada "Kullanıcı fotoğraf ve videoları" galerisi
         if (photoReviewsCount === 0) {
