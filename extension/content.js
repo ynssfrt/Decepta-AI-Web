@@ -347,8 +347,7 @@
                 for (let i = 0; i < scripts.length; i++) {
                     const txt = scripts[i].textContent || '';
                     // Sadece ana ürünün verilerini tutan özel script bloklarında arama yap
-                    // Sayfa 1'de __HB_REVIEWS_INITIAL_STATE__ kullanılırken, sayfa 3'te reduxStore veya HERMES kullanılıyor olabilir.
-                    if (txt.includes('__HB_REVIEWS_INITIAL_STATE__') || txt.includes('HERMES') || scripts[i].id === 'reduxStore' || txt.includes('reduxStore')) {
+                    if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
                         const totalMatch = txt.match(/["']?(?:totalReviewCount|customerReviewCount|totalItemCount)["']?\s*:\s*(\d+)/);
                         if (totalMatch) {
                             commentCount = parseInt(totalMatch[1]);
@@ -377,7 +376,7 @@
                 
                 const yorumPatterns = [
                     /[Yy]orum(?:lu|lar)?\s*\(?(\d[\d.]*)\)?/,
-                    /(\d[\d.]*)\s*(?:Yorum|Değerlendirme)/i
+                    /(\d[\d.]*)\s*[Yy]orum/i
                 ];
                 for (const pat of yorumPatterns) {
                     const m = safeText.match(pat);
