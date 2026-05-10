@@ -331,9 +331,15 @@
         }
 
         // ========== HEPSİBURADA: YORUM SAYISI ==========
-        if (commentCount === 0 && isHepsiburada) {
+        if (isHepsiburada) {
+            // __NEXT_DATA__'dan yanlışlıkla gelen diğer ürünlerin sayısını (örn. 29) yoksay ve sıfırla.
+            // Çünkü Hepsiburada'da asıl veriler __HB_REVIEWS_INITIAL_STATE__ içindedir.
+            commentCount = 0;
+            let hbSuccess = false;
+            
             if (typeof window.__hb_commentCount !== 'undefined') {
                 commentCount = window.__hb_commentCount;
+                hbSuccess = true;
             } else {
                 // YÖNTEM 1: Sayfadaki <script> tag'lerinin orijinal metni (DOM) üzerinden veriyi oku.
                 // Bu yöntem CSP (Content Security Policy) hatası vermez ve sayfa window objesini silse bile çalışır.
@@ -342,37 +348,43 @@
                     const txt = scripts[i].textContent || '';
                     if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
                         const totalMatch = txt.match(/"totalReviewCount"\s*:\s*(\d+)/);
-                        if (totalMatch) commentCount = parseInt(totalMatch[1]);
+                        if (totalMatch) {
+                            commentCount = parseInt(totalMatch[1]);
+                            hbSuccess = true;
+                        }
                         
                         const mediaMatch = txt.match(/"approvedMediaReviewCount"\s*:\s*(\d+)/);
                         if (mediaMatch) window.__hb_photoCount = parseInt(mediaMatch[1]);
                         
-                        if (commentCount > 0) break;
+                        if (hbSuccess) break;
                     }
                 }
             }
             
-            // Eğer hala 0 ise fallback'e düş
-            if (commentCount === 0) {
+            // Eğer asıl veritabanından çekilemediyse fallback'e düş
+            if (!hbSuccess) {
                 const yorumluBody = bodyText.match(/[Yy]orumlu\s*\(?(\d[\d.]*)\)?/);
                 if (yorumluBody) {
                     commentCount = parseInt(yorumluBody[1].replace(/\./g, ''));
                 }
-            }
-            if (commentCount === 0) {
-                const reviewCards = document.querySelectorAll('[class*="ReviewCard-module"], [class*="hermes-ReviewCard"]');
-                let withText = 0;
-                reviewCards.forEach(card => {
-                    const allText = (card.innerText || '').trim();
-                    if (allText.length > 60) withText++;
-                });
-                if (withText > 0) commentCount = withText;
-            }
-            if (commentCount === 0) {
-                commentCount = comments.filter(c => c !== '[Sadece Görsel]' && c.length > 5).length;
-            }
-            if (commentCount === 0 && ratingsCount > 0) {
-                commentCount = comments.length > 0 ? comments.length : ratingsCount;
+                
+                if (commentCount === 0) {
+                    const reviewCards = document.querySelectorAll('[class*="ReviewCard-module"], [class*="hermes-ReviewCard"]');
+                    let withText = 0;
+                    reviewCards.forEach(card => {
+                        const allText = (card.innerText || '').trim();
+                        if (allText.length > 60) withText++;
+                    });
+                    if (withText > 0) commentCount = withText;
+                }
+                
+                if (commentCount === 0) {
+                    commentCount = comments.filter(c => c !== '[Sadece Görsel]' && c.length > 5).length;
+                }
+                
+                if (commentCount === 0 && ratingsCount > 0) {
+                    commentCount = comments.length > 0 ? comments.length : ratingsCount;
+                }
             }
         }
         
