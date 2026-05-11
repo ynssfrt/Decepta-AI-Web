@@ -330,19 +330,22 @@
             }
         }
 
-// Decepta AI - DOM Extractor v8.3
-// Hepsiburada Kesin Çözüm - v1.3.2
+// Decepta AI - DOM Extractor v8.4
+// Hepsiburada Kesin Çözüm v2 - v1.3.2
 
-        // ========== HEPSİBURADA: KESİN AYIKLAMA (v8.3) ==========
+        // ========== HEPSİBURADA: KESİN AYIKLAMA (v8.4) ==========
         if (isHepsiburada) {
             let hbPhotoCount = 0;
             let hbSuccess = false;
             
-            // 1. ADIM: DOM Butonları ve Tablar (En doğru ve görünür kaynak)
-            // Sayfadaki "Yorumlar (26)" ve "Fotoğraflı Yorumlar (4)" metinlerini ara
-            const allElements = document.querySelectorAll('button, a, span, b');
-            for (const el of allElements) {
+            // 1. ADIM: DOM Butonları ve Tablar (Tüm elementleri tara)
+            const allElements = document.getElementsByTagName('*');
+            for (let i = 0; i < allElements.length; i++) {
+                const el = allElements[i];
+                if (el.children.length > 0) continue; // Sadece en uçtaki (leaf) elementleri kontrol et (performans)
+                
                 const txt = el.innerText.trim();
+                if (!txt.includes('(')) continue;
                 
                 // Yorum Sayısı: "Yorumlar (26)"
                 if (!hbSuccess || commentCount === 0) {
@@ -353,7 +356,7 @@
                     }
                 }
                 
-                // Fotoğraf Sayısı: "Fotoğraflı Yorumlar (4)" veya "Fotoğraflı (4)"
+                // Fotoğraf Sayısı: "Fotoğraflı (4)"
                 if (hbPhotoCount === 0) {
                     const m = txt.match(/Foto(?:ğ|g)rafl[ıi](?:\s*Yorumlar)?\s*\((\d+)\)/i);
                     if (m) {
@@ -362,25 +365,42 @@
                 }
             }
 
-            // 2. ADIM: Script Verisi (Eğer butonlardan bulunamadıysa)
+            // 2. ADIM: Script Verisi (Brace matching ile güvenli JSON çekimi)
             if (!hbSuccess || hbPhotoCount === 0) {
                 const scripts = document.querySelectorAll('script');
                 for (let i = 0; i < scripts.length; i++) {
                     const txt = scripts[i].textContent || '';
                     if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
                         try {
-                            const jsonMatch = txt.match(/__HB_REVIEWS_INITIAL_STATE__\s*=\s*(\{.*\})(?:;|$)/);
-                            if (jsonMatch) {
-                                const state = JSON.parse(jsonMatch[1]);
-                                if (!ratingsCount && state.ratingSummary?.totalReviewCount) {
-                                    ratingsCount = parseInt(state.ratingSummary.totalReviewCount);
+                            const startIdx = txt.indexOf('{', txt.indexOf('__HB_REVIEWS_INITIAL_STATE__'));
+                            if (startIdx > -1) {
+                                // Süslü parantez eşleştirme mantığı
+                                let balance = 0;
+                                let endIdx = -1;
+                                for (let j = startIdx; j < txt.length; j++) {
+                                    if (txt[j] === '{') balance++;
+                                    else if (txt[j] === '}') balance--;
+                                    
+                                    if (balance === 0) {
+                                        endIdx = j;
+                                        break;
+                                    }
                                 }
-                                if (!hbSuccess && state.productReviews?.totalReviewCount) {
-                                    commentCount = parseInt(state.productReviews.totalReviewCount);
-                                    hbSuccess = true;
-                                }
-                                if (hbPhotoCount === 0) {
-                                    hbPhotoCount = state.mediaSummary?.approvedMediaReviewCount || state.productReviews?.mediaCount || 0;
+                                
+                                if (endIdx > -1) {
+                                    const jsonStr = txt.substring(startIdx, endIdx + 1);
+                                    const state = JSON.parse(jsonStr);
+                                    
+                                    if (!ratingsCount && state.ratingSummary?.totalReviewCount) {
+                                        ratingsCount = parseInt(state.ratingSummary.totalReviewCount);
+                                    }
+                                    if (!hbSuccess && state.productReviews?.totalReviewCount) {
+                                        commentCount = parseInt(state.productReviews.totalReviewCount);
+                                        hbSuccess = true;
+                                    }
+                                    if (hbPhotoCount === 0) {
+                                        hbPhotoCount = state.mediaSummary?.approvedMediaReviewCount || state.productReviews?.mediaCount || 0;
+                                    }
                                 }
                             }
                         } catch (e) {}
@@ -389,34 +409,38 @@
                 }
             }
 
-            // 3. ADIM: Fallback - Pagination Metni (Sadece güvenli olanlar)
+            // 3. ADIM: Pagination ve Metin Fallback
             if (!hbSuccess || commentCount === 0) {
-                const pagText = bodyText.match(/toplam\s*(\d+)\s*yorum/i) || bodyText.match(/(\d+)\s*yorumlu/i);
+                const pagText = bodyText.match(/toplam\s*(\d+)\s*yorum/i) || bodyText.match(/(\d+)\s*yorumlu/i) || bodyText.match(/(\d+)\s*Değerlendirme/i);
                 if (pagText) {
                     commentCount = parseInt(pagText[1]);
                     hbSuccess = true;
                 }
             }
 
-            // 4. ADIM: Fotoğraf Sayma (DOM Fallback)
-            if (hbPhotoCount === 0) {
-                const gallery = document.querySelector('[class*="ImageGallery"], [class*="media-gallery"]');
-                if (gallery) {
-                    hbPhotoCount = gallery.querySelectorAll('img').length;
+            // 4. ADIM: Kart Sayma (DOM)
+            if (!hbSuccess || commentCount === 0) {
+                const cards = document.querySelectorAll('[class*="ReviewCard"], [class*="hermes-ReviewCard"]');
+                if (cards.length > 0) {
+                    commentCount = cards.length;
+                    hbSuccess = true;
                 }
             }
 
-            // 5. ADIM: Mantıksal Doğrulama (363 gibi saçma rakamları engelle)
-            // Değerlendirme sayısı (53) her zaman Yorum sayısından (26) büyük veya eşit olmalıdır.
-            if (ratingsCount > 0 && commentCount > ratingsCount) {
-                // Eğer yorum sayısı değerlendirmeden fazlaysa, kesin bir hata vardır.
-                // Bu durumda script'teki productReviews bloğunu tekrar zorla çekmeye çalış.
-                commentCount = ratingsCount; // Geçici olarak eşitle
+            // 5. ADIM: SON ÇARE - Değerlendirme sayısını kullan (0'dan iyidir)
+            if (commentCount === 0 && ratingsCount > 0) {
+                commentCount = ratingsCount;
             }
 
-            if (hbPhotoCount > 0) window.__hb_photoCount = hbPhotoCount;
-            
-            // Sonuçları hazırla ve ERKEN DÖN (Böylece Section 7 regexleri çalışmaz)
+            // 6. ADIM: Fotoğraf Sayma (DOM)
+            if (hbPhotoCount === 0) {
+                const gallery = document.querySelector('[class*="ImageGallery"], [class*="media-gallery"]');
+                if (gallery) hbPhotoCount = gallery.querySelectorAll('img').length;
+            }
+
+            // Doğrulama
+            if (ratingsCount > 0 && commentCount > ratingsCount) commentCount = ratingsCount;
+
             const hbResult = {
                 extracted_data: {
                     score: score || 0,
@@ -425,10 +449,10 @@
                     comments: comments,
                     detailed_reviews: detailedReviews,
                     photo_reviews_count: hbPhotoCount || 0,
-                    debug_source: 'HB:V8.3'
+                    debug_source: 'HB:V8.4'
                 },
-                html: document.documentElement.outerHTML,
-                text: bodyText
+                html: document.documentElement.outerHTML.substring(0, 500),
+                text: bodyText.substring(0, 500)
             };
             return hbResult;
         }
