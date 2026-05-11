@@ -330,131 +330,93 @@
             }
         }
 
-// Decepta AI - DOM Extractor v8.4
-// Hepsiburada Kesin Çözüm v2 - v1.3.2
+// Decepta AI - DOM Extractor v8.5
+// Hepsiburada Bulletproof Fix - v1.3.2
 
-        // ========== HEPSİBURADA: KESİN AYIKLAMA (v8.4) ==========
+        // ========== HEPSİBURADA: ÖZEL AYIKLAMA (v8.5) ==========
         if (isHepsiburada) {
             let hbPhotoCount = 0;
             let hbSuccess = false;
-            
-            // 1. ADIM: DOM Butonları ve Tablar (Tüm elementleri tara)
-            const allElements = document.getElementsByTagName('*');
-            for (let i = 0; i < allElements.length; i++) {
-                const el = allElements[i];
-                if (el.children.length > 0) continue; // Sadece en uçtaki (leaf) elementleri kontrol et (performans)
-                
-                const txt = el.innerText.trim();
-                if (!txt.includes('(')) continue;
-                
-                // Yorum Sayısı: "Yorumlar (26)"
-                if (!hbSuccess || commentCount === 0) {
-                    const m = txt.match(/Yorum(?:lar)?\s*\((\d+)\)/i);
-                    if (m) {
-                        commentCount = parseInt(m[1]);
-                        hbSuccess = true;
-                    }
+
+            // Puan ve Değerlendirme Sayısı Kontrolü (Eğer önceki bölümler bulamadıysa)
+            if (ratingsCount === 0) {
+                const countEl = document.querySelector('[class*="ReviewSummary"] [class*="count"]') || document.querySelector('[itemprop="ratingCount"]');
+                if (countEl) {
+                    const m = countEl.innerText.match(/(\d+)/);
+                    if (m) ratingsCount = parseInt(m[1]);
                 }
-                
-                // Fotoğraf Sayısı: "Fotoğraflı (4)"
-                if (hbPhotoCount === 0) {
-                    const m = txt.match(/Foto(?:ğ|g)rafl[ıi](?:\s*Yorumlar)?\s*\((\d+)\)/i);
-                    if (m) {
-                        hbPhotoCount = parseInt(m[1]);
-                    }
+            }
+            if (score === 0) {
+                const scoreEl = document.querySelector('[class*="RatingPointer"]') || document.querySelector('[itemprop="ratingValue"]');
+                if (scoreEl) {
+                    score = parseFloat((scoreEl.getAttribute('content') || scoreEl.innerText || '').replace(',', '.'));
                 }
             }
 
-            // 2. ADIM: Script Verisi (Brace matching ile güvenli JSON çekimi)
+            // 1. ADIM: Butonlar ve Tablar (Özel Seçicilerle)
+            const tabs = document.querySelectorAll('button[class*="hermes"], a[class*="hermes"], .hermes-ReviewSummary-module-ratingCount');
+            tabs.forEach(el => {
+                const txt = el.innerText || '';
+                const mYorum = txt.match(/Yorum(?:lar)?\s*\((\d+)\)/i);
+                if (mYorum && (!hbSuccess || commentCount === 0)) {
+                    commentCount = parseInt(mYorum[1]);
+                    hbSuccess = true;
+                }
+                const mFoto = txt.match(/Foto(?:ğ|g)rafl[ıi](?:\s*Yorumlar)?\s*\((\d+)\)/i);
+                if (mFoto && hbPhotoCount === 0) {
+                    hbPhotoCount = parseInt(mFoto[1]);
+                }
+            });
+
+            // 2. ADIM: Script Verisi (Güvenli)
             if (!hbSuccess || hbPhotoCount === 0) {
-                const scripts = document.querySelectorAll('script');
-                for (let i = 0; i < scripts.length; i++) {
-                    const txt = scripts[i].textContent || '';
-                    if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
-                        try {
-                            const startIdx = txt.indexOf('{', txt.indexOf('__HB_REVIEWS_INITIAL_STATE__'));
-                            if (startIdx > -1) {
-                                // Süslü parantez eşleştirme mantığı
-                                let balance = 0;
-                                let endIdx = -1;
-                                for (let j = startIdx; j < txt.length; j++) {
-                                    if (txt[j] === '{') balance++;
-                                    else if (txt[j] === '}') balance--;
-                                    
-                                    if (balance === 0) {
-                                        endIdx = j;
-                                        break;
-                                    }
-                                }
-                                
-                                if (endIdx > -1) {
-                                    const jsonStr = txt.substring(startIdx, endIdx + 1);
-                                    const state = JSON.parse(jsonStr);
-                                    
-                                    if (!ratingsCount && state.ratingSummary?.totalReviewCount) {
-                                        ratingsCount = parseInt(state.ratingSummary.totalReviewCount);
-                                    }
-                                    if (!hbSuccess && state.productReviews?.totalReviewCount) {
-                                        commentCount = parseInt(state.productReviews.totalReviewCount);
-                                        hbSuccess = true;
-                                    }
-                                    if (hbPhotoCount === 0) {
-                                        hbPhotoCount = state.mediaSummary?.approvedMediaReviewCount || state.productReviews?.mediaCount || 0;
-                                    }
-                                }
+                try {
+                    const scripts = document.querySelectorAll('script');
+                    for (const s of scripts) {
+                        const txt = s.textContent || '';
+                        if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
+                            const start = txt.indexOf('{', txt.indexOf('__HB_REVIEWS_INITIAL_STATE__'));
+                            let balance = 0;
+                            let end = -1;
+                            for (let i = start; i < txt.length; i++) {
+                                if (txt[i] === '{') balance++;
+                                else if (txt[i] === '}') balance--;
+                                if (balance === 0) { end = i; break; }
                             }
-                        } catch (e) {}
-                        break;
+                            if (end > -1) {
+                                const state = JSON.parse(txt.substring(start, end + 1));
+                                if (!ratingsCount) ratingsCount = state.ratingSummary?.totalReviewCount || 0;
+                                if (!hbSuccess) { commentCount = state.productReviews?.totalReviewCount || 0; hbSuccess = true; }
+                                if (hbPhotoCount === 0) hbPhotoCount = state.mediaSummary?.approvedMediaReviewCount || 0;
+                            }
+                            break;
+                        }
                     }
-                }
+                } catch(e) {}
             }
 
-            // 3. ADIM: Pagination ve Metin Fallback
+            // 3. ADIM: FALLBACKS
             if (!hbSuccess || commentCount === 0) {
-                const pagText = bodyText.match(/toplam\s*(\d+)\s*yorum/i) || bodyText.match(/(\d+)\s*yorumlu/i) || bodyText.match(/(\d+)\s*Değerlendirme/i);
-                if (pagText) {
-                    commentCount = parseInt(pagText[1]);
-                    hbSuccess = true;
-                }
+                const pag = bodyText.match(/toplam\s*(\d+)\s*yorum/i);
+                if (pag) { commentCount = parseInt(pag[1]); hbSuccess = true; }
             }
-
-            // 4. ADIM: Kart Sayma (DOM)
             if (!hbSuccess || commentCount === 0) {
-                const cards = document.querySelectorAll('[class*="ReviewCard"], [class*="hermes-ReviewCard"]');
-                if (cards.length > 0) {
-                    commentCount = cards.length;
-                    hbSuccess = true;
-                }
+                const cards = document.querySelectorAll('[class*="ReviewCard"]');
+                if (cards.length > 0) { commentCount = cards.length; hbSuccess = true; }
             }
+            
+            // Son Çare: Eğer yorum yoksa ama değerlendirme varsa, değerlendirmeyi yorum say
+            if (commentCount === 0 && ratingsCount > 0) commentCount = ratingsCount;
 
-            // 5. ADIM: SON ÇARE - Değerlendirme sayısını kullan (0'dan iyidir)
-            if (commentCount === 0 && ratingsCount > 0) {
-                commentCount = ratingsCount;
-            }
-
-            // 6. ADIM: Fotoğraf Sayma (DOM)
+            // Fotoğraf Fallback
             if (hbPhotoCount === 0) {
-                const gallery = document.querySelector('[class*="ImageGallery"], [class*="media-gallery"]');
-                if (gallery) hbPhotoCount = gallery.querySelectorAll('img').length;
+                const imgs = document.querySelectorAll('[class*="ImageGallery"] img');
+                if (imgs.length > 0) hbPhotoCount = imgs.length;
             }
 
-            // Doğrulama
-            if (ratingsCount > 0 && commentCount > ratingsCount) commentCount = ratingsCount;
-
-            const hbResult = {
-                extracted_data: {
-                    score: score || 0,
-                    total_ratings: ratingsCount || 0,
-                    total_reviews: commentCount || 0,
-                    comments: comments,
-                    detailed_reviews: detailedReviews,
-                    photo_reviews_count: hbPhotoCount || 0,
-                    debug_source: 'HB:V8.4'
-                },
-                html: document.documentElement.outerHTML.substring(0, 500),
-                text: bodyText.substring(0, 500)
-            };
-            return hbResult;
+            if (hbPhotoCount > 0) window.__hb_photoCount = hbPhotoCount;
+            if (commentCount > 0) window.__hb_done = true;
+            debug_source = 'HB:V8.5';
         }
         
         // Fallback (sadece Trendyol vb. için — HB zaten yukarıda ele alındı)
