@@ -330,47 +330,48 @@
             }
         }
 
-        // ========== HEPSİBURADA: ÖZEL AYIKLAMA (v8) ==========
+        // Decepta AI - DOM Extractor v8
+        // Trendyol + Hepsiburada uyumlu - v1.3.2
+
+        // ========== HEPSİBURADA: ÖZEL AYIKLAMA (v8.1) ==========
         if (isHepsiburada) {
-            // Başlangıç değerlerini sıfırla
-            commentCount = 0;
             let hbPhotoCount = 0;
             let hbSuccess = false;
 
-            // 1. ADIM: Sayfadaki Script Verisini Ayıkla (EN GÜVENİLİR)
+            // 1. ADIM: Script Verisi (JSON parse denemesi)
             const scripts = document.querySelectorAll('script');
             for (let i = 0; i < scripts.length; i++) {
                 const txt = scripts[i].textContent || '';
                 if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
                     try {
-                        // Regex ile JSON bloğunu temizle ve al
-                        const jsonMatch = txt.match(/__HB_REVIEWS_INITIAL_STATE__\s*=\s*(\{[\s\S]*?\});/);
+                        // Regex: window.__HB... = { ... } [;] (Semicolon opsiyonel)
+                        const jsonMatch = txt.match(/__HB_REVIEWS_INITIAL_STATE__\s*=\s*(\{[\s\S]*?\})(?:;|$)/);
                         if (jsonMatch) {
                             const state = JSON.parse(jsonMatch[1]);
                             
-                            // Değerlendirme (Rating) Sayısı -> 53
                             if (state.ratingSummary && state.ratingSummary.totalReviewCount) {
                                 ratingsCount = parseInt(state.ratingSummary.totalReviewCount);
                             }
                             
-                            // Yazılı Yorum Sayısı -> 26
                             if (state.productReviews && state.productReviews.totalReviewCount) {
                                 commentCount = parseInt(state.productReviews.totalReviewCount);
                                 hbSuccess = true;
                             }
                             
-                            // Fotoğraflı Yorum Sayısı -> 4
                             if (state.mediaSummary && state.mediaSummary.approvedMediaReviewCount) {
                                 hbPhotoCount = parseInt(state.mediaSummary.approvedMediaReviewCount);
                             } else if (state.productReviews && state.productReviews.mediaCount) {
                                 hbPhotoCount = parseInt(state.productReviews.mediaCount);
                             }
                         }
-                    } catch (e) {
-                        // JSON Parse hatası durumunda eski regex fallback
+                    } catch (e) { /* JSON parse başarısızsa devam et */ }
+                    
+                    // JSON parse başarısız olsa bile regex ile tek tek dene
+                    if (!hbSuccess) {
                         const prMatch = txt.match(/"productReviews"\s*:\s*\{[^}]*?"totalReviewCount"\s*:\s*(\d+)/);
                         if (prMatch) { commentCount = parseInt(prMatch[1]); hbSuccess = true; }
-                        
+                    }
+                    if (hbPhotoCount === 0) {
                         const mediaMatch = txt.match(/"approvedMediaReviewCount"\s*:\s*(\d+)/) || txt.match(/"mediaCount"\s*:\s*(\d+)/);
                         if (mediaMatch) hbPhotoCount = parseInt(mediaMatch[1]);
                     }
@@ -378,21 +379,27 @@
                 }
             }
 
-            // 2. ADIM: Pagination Metninden Ayıkla (26'yı bulmak için)
-            // Örn: "1 - 10 / 26" veya "sayfa 1 / 6"
+            // 2. ADIM: Pagination Metni (26'yı bulmak için)
             if (!hbSuccess || commentCount === 0) {
                 const pagText = bodyText.match(/(\d+)\s*-\s*(\d+)\s*\/\s*(\d+)/) || bodyText.match(/toplam\s*(\d+)\s*yorum/i);
                 if (pagText) {
                     const val = parseInt(pagText[3] || pagText[1]);
-                    if (val > 0 && val < ratingsCount) {
+                    if (val > 0 && val <= (ratingsCount || 10000)) {
                         commentCount = val;
                         hbSuccess = true;
                     }
                 }
             }
 
-            // 3. ADIM: DOM'dan Sayma (Fotoğrafları bulmak için)
-            // Hepsiburada'da fotoğraflar genelde bir galeri içindedir
+            // 3. ADIM: DOM Kart Sayma Fallback (Yorumlar 0 ise)
+            if (!hbSuccess || commentCount === 0) {
+                const cards = document.querySelectorAll('[class*="ReviewCard"], [class*="hermes-ReviewCard"]');
+                if (cards.length > 0) {
+                    commentCount = cards.length; // En azından mevcut sayfadakileri say
+                }
+            }
+
+            // 4. ADIM: Fotoğraf Sayma Fallback
             if (hbPhotoCount === 0) {
                 const galleryImgs = document.querySelectorAll('[class*="ImageGallery"] img, [class*="media-gallery"] img, [class*="review-image"] img');
                 const photoSet = new Set();
@@ -405,7 +412,6 @@
                 if (photoSet.size > 0) hbPhotoCount = photoSet.size;
             }
 
-            // Değerleri global değişkenlere ata
             if (hbPhotoCount > 0) window.__hb_photoCount = hbPhotoCount;
         }
         
