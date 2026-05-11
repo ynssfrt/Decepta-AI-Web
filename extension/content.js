@@ -308,7 +308,7 @@
         }
         
         // YORUM sayısı (yazılı): "789 yorum" veya "Yorumlar (789)" vb.
-        if (commentCount === 0) {
+        if (commentCount === 0 && !window.__hb_done) {
             const patterns = [
                 /(\d[\d.]*)\s*[Yy]orum/,
                 /[Yy]orum(?:lar)?\s*\(?(\d[\d.]*)\)?/,
@@ -330,10 +330,12 @@
             }
         }
 
-        // Decepta AI - DOM Extractor v8
-        // Trendyol + Hepsiburada uyumlu - v1.3.2
+// Decepta AI - DOM Extractor v8.2
+// Trendyol + Hepsiburada uyumlu - v1.3.2
 
-        // ========== HEPSİBURADA: ÖZEL AYIKLAMA (v8.1) ==========
+// ... (v7 header'ı da buna dahil olacak şekilde en üstten değiştirebiliriz ama sadece bu bloğu istiyoruz)
+
+        // ========== HEPSİBURADA: ÖZEL AYIKLAMA (v8.2) ==========
         if (isHepsiburada) {
             let hbPhotoCount = 0;
             let hbSuccess = false;
@@ -344,8 +346,8 @@
                 const txt = scripts[i].textContent || '';
                 if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
                     try {
-                        // Regex: window.__HB... = { ... } [;] (Semicolon opsiyonel)
-                        const jsonMatch = txt.match(/__HB_REVIEWS_INITIAL_STATE__\s*=\s*(\{[\s\S]*?\})(?:;|$)/);
+                        // Regex: window.__HB... = { ... } [;] (Greedy match to get the whole object)
+                        const jsonMatch = txt.match(/__HB_REVIEWS_INITIAL_STATE__\s*=\s*(\{.*\})(?:;|$)/);
                         if (jsonMatch) {
                             const state = JSON.parse(jsonMatch[1]);
                             
@@ -395,7 +397,7 @@
             if (!hbSuccess || commentCount === 0) {
                 const cards = document.querySelectorAll('[class*="ReviewCard"], [class*="hermes-ReviewCard"]');
                 if (cards.length > 0) {
-                    commentCount = cards.length; // En azından mevcut sayfadakileri say
+                    commentCount = cards.length;
                 }
             }
 
@@ -413,6 +415,12 @@
             }
 
             if (hbPhotoCount > 0) window.__hb_photoCount = hbPhotoCount;
+            
+            // KRİTİK: HB için genel regex fallthrough'unu engelle (363 gibi hatalı sayılar gelmesin)
+            if (commentCount > 0) {
+                // Bölüm 7'deki genel regexlerin çalışmasını engellemek için bir bayrak bırakıyoruz
+                window.__hb_done = true;
+            }
         }
         
         // Fallback (sadece Trendyol vb. için — HB zaten yukarıda ele alındı)
