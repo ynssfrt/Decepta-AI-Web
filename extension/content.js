@@ -1,5 +1,5 @@
-// Decepta AI - DOM Extractor v11
-// Hepsiburada + Trendyol Kesin Çözüm - v1.3.5
+// Decepta AI - DOM Extractor v12
+// Hepsiburada + Trendyol Kesin Çözüm - v1.3.6
 (() => {
     try {
         const url = window.location.href;
@@ -13,7 +13,6 @@
         let debug_source = '';
 
         // 1. ADIM: KRİTİK METADATA (Puan ve Değerlendirme Sayısı)
-        // Puan Bulma
         const scoreEls = ['.pr-in-rnr-v', '[class*="RatingPointer"]', '[itemprop="ratingValue"]', '.rnr-avg-rnr-v'];
         for (const sel of scoreEls) {
             const el = document.querySelector(sel);
@@ -27,8 +26,7 @@
             if (m) score = parseFloat(m[1].replace(',', '.'));
         }
 
-        // Değerlendirme Sayısı Bulma (En kritik yer: 53'ü bulmalı)
-        const countEls = ['.rvw-cnt-tx', '.total-review-count', '[itemprop="ratingCount"]', '[class*="count"]', '[class*="ratingCount"]'];
+        const countEls = ['.rvw-cnt-tx', '[itemprop="ratingCount"]', '[class*="count"]', '.hermes-ReviewSummary-module-ratingCount'];
         for (const sel of countEls) {
             const els = document.querySelectorAll(sel);
             for (const el of els) {
@@ -45,28 +43,31 @@
             if (m) ratingsCount = parseInt(m[1].replace(/\./g, ''));
         }
 
-        // 2. ADIM: HEPSİBURADA ÖZEL (v11)
+        // 2. ADIM: HEPSİBURADA ÖZEL (v12)
         if (isHepsiburada) {
             let hbSuccess = false;
 
-            // Butonlar, Tablar ve Linkler (Yorum ve Fotoğraf Sayısı)
-            const elements = document.querySelectorAll('button, a, span, b, div[class*="hermes"]');
-            elements.forEach(el => {
-                const txt = el.innerText || '';
-                // Yorum Sayısı: "Yorumlar (26)"
-                const mYorum = txt.match(/Yorum(?:lar)?\s*\((\d+)\)/i);
-                if (mYorum && (!hbSuccess || commentCount === 0)) {
-                    commentCount = parseInt(mYorum[1]);
+            // A. Metin Üzerinden Kesin Arama (Yorumlar (26) ve Fotoğraflı (4))
+            const mYorum = bodyText.match(/Yorum(?:lar)?\s*\((\d+)\)/i);
+            if (mYorum) {
+                commentCount = parseInt(mYorum[1]);
+                hbSuccess = true;
+            }
+            const mFoto = bodyText.match(/Foto(?:ğ|g)rafl[ıi](?:\s*Yorumlar)?\s*\((\d+)\)/i);
+            if (mFoto) {
+                hbPhotoCount = parseInt(mFoto[1]);
+            }
+
+            // B. Pagination Araması (1 - 10 / 26)
+            if (!hbSuccess || commentCount === 0) {
+                const pag = bodyText.match(/(\d+)\s*-\s*(\d+)\s*\/\s*(\d+)/);
+                if (pag) {
+                    commentCount = parseInt(pag[3]);
                     hbSuccess = true;
                 }
-                // Fotoğraf Sayısı: "Fotoğraflı (4)"
-                const mFoto = txt.match(/Foto(?:ğ|g)rafl[ıi](?:\s*Yorumlar)?\s*\((\d+)\)/i);
-                if (mFoto && hbPhotoCount === 0) {
-                    hbPhotoCount = parseInt(mFoto[1]);
-                }
-            });
+            }
 
-            // Script Verisi (Yedek)
+            // C. Script Verisi (Brace Matching)
             if (!hbSuccess || hbPhotoCount === 0) {
                 try {
                     const scripts = document.querySelectorAll('script');
@@ -91,7 +92,7 @@
                 } catch(e) {}
             }
 
-            // HB için mantıksal düzeltmeler
+            // HB Fallbacks
             if (commentCount === 0 && ratingsCount > 0) commentCount = ratingsCount;
             if (hbPhotoCount === 0) {
                 const imgs = document.querySelectorAll('[class*="ImageGallery"] img, [class*="media-gallery"] img');
@@ -107,14 +108,14 @@
                     comments: [],
                     detailed_reviews: [],
                     photo_reviews_count: hbPhotoCount || 0,
-                    debug_source: 'HB:V11'
+                    debug_source: 'HB:V12'
                 },
                 html: document.documentElement.outerHTML.substring(0, 500),
                 text: bodyText.substring(0, 500)
             };
         }
 
-        // 3. ADIM: DİĞER SİTELER (Trendyol vb.)
+        // 3. ADIM: DİĞER SİTELER
         if (commentCount === 0) {
             const m = bodyText.match(/(\d[\d.]*)\s*[Yy]orum/);
             if (m) commentCount = parseInt(m[1].replace(/\./g, ''));
@@ -128,7 +129,7 @@
                 comments: [],
                 detailed_reviews: [],
                 photo_reviews_count: 0,
-                debug_source: 'GENERIC:V11'
+                debug_source: 'GENERIC:V12'
             }
         };
 
