@@ -1,5 +1,5 @@
-// Decepta AI - DOM Extractor v17
-// Hepsiburada + Trendyol Kesin Çözüm - v1.3.11
+// Decepta AI - DOM Extractor v18
+// Hepsiburada + Trendyol Kesin Çözüm - v1.3.12
 (() => {
     try {
         const url = window.location.href;
@@ -16,41 +16,49 @@
             const el = document.querySelector(sel);
             if (el) { score = parseFloat((el.getAttribute('content') || el.innerText || '').replace(',', '.')); if (score > 0) break; }
         }
-        if (ratingsCount === 0) {
-            const m = bodyText.match(/(\d+)\s*[Dd]eğerlendirme/);
-            if (m) ratingsCount = parseInt(m[1]);
-        }
+        const mRatings = bodyText.match(/(\d+)\s*[Dd]eğerlendirme/);
+        if (mRatings) ratingsCount = parseInt(mRatings[1]);
 
-        // 2. ADIM: HEPSİBURADA ÖZEL (v17 - En Sağlam Regex Seti)
+        // 2. ADIM: HEPSİBURADA ÖZEL (v18 - Kolektif Veri Analizi)
         if (isHepsiburada) {
-            // A. JSON Taraması (Çok esnek ama blok içinde)
-            // Hepsiburada JSON'u: "productReviews":{"totalReviewCount":26}
-            const mR = html.match(/"productReviews"[\s\S]{0,1000}?"totalReviewCount"\s*:\s*(\d+)/);
-            if (mR) { commentCount = parseInt(mR[1]); dbg += "R"; }
+            // A. JSON Havuzu Taraması (Tüm totalReviewCount değerlerini topla)
+            const allCounts = [];
+            const matches = html.match(/"totalReviewCount"\s*:\s*(\d+)/g);
+            if (matches) {
+                matches.forEach(m => {
+                    const val = parseInt(m.match(/(\d+)/)[1]);
+                    if (val > 0 && val < 1000000) allCounts.push(val);
+                });
+            }
             
-            const mP = html.match(/"mediaSummary"[\s\S]{0,1000}?"approvedMediaReviewCount"\s*:\s*(\d+)/);
+            // ratingsCount 53 ise, allCounts içinde 53 olmayan en büyük sayı yorum sayısıdır (26 gibi)
+            if (allCounts.length > 0) {
+                if (!ratingsCount) ratingsCount = Math.max(...allCounts);
+                const candidates = allCounts.filter(v => v !== ratingsCount).sort((a,b) => b-a);
+                if (candidates.length > 0) {
+                    commentCount = candidates[0];
+                    dbg += "J";
+                }
+            }
+
+            // B. Fotoğraf Sayısı (JSON içinden)
+            const mP = html.match(/"approvedMediaReviewCount"\s*:\s*(\d+)/) || html.match(/"mediaCount"\s*:\s*(\d+)/);
             if (mP) { hbPhotoCount = parseInt(mP[1]); dbg += "P"; }
 
-            // B. Metin Taraması (Daha esnek parantez ve boşluk desteği)
+            // C. Metin Taraması (Yedek)
             if (commentCount === 0) {
-                // "Yorumlar (26)" veya "Yorumlar(26)" veya "Yorumlar ( 26 )"
-                const mY = bodyText.match(/[Yy]orum(?:lar)?\s*\(\s*(\d+)\s*\)/i) || html.match(/[Yy]orum(?:lar)?\s*\(\s*(\d+)\s*\)/i);
+                const mY = bodyText.match(/Yorumlar\s*\(\s*(\d+)\s*\)/i);
                 if (mY) { commentCount = parseInt(mY[1]); dbg += "T"; }
             }
-            if (commentCount === 0) {
-                // "Toplam 26 yorum" kalıbı
-                const mT = bodyText.match(/toplam\s+(\d+)\s+yorum/i);
-                if (mT) { commentCount = parseInt(mT[1]); dbg += "M"; }
-            }
-            if (hbPhotoCount === 0) {
-                const mF = bodyText.match(/[Ff]oto(?:ğ|g)rafl[ıi](?:\s*Yorumlar)?\s*\(\s*(\d+)\s*\)/i) || html.match(/[Ff]oto(?:ğ|g)rafl[ıi](?:\s*Yorumlar)?\s*\(\s*(\d+)\s*\)/i);
-                if (mF) { hbPhotoCount = parseInt(mF[1]); }
-            }
 
-            // C. Fallbacks ve Doğrulama
-            if (commentCount > 1000000) commentCount = 0; // Garbage temizleme
+            // D. Son Çare ve Mantık Kontrolü
             if (commentCount === 0 && ratingsCount > 0) { commentCount = ratingsCount; dbg += "F"; }
-            if (ratingsCount > 0 && commentCount > ratingsCount) commentCount = ratingsCount;
+            if (ratingsCount > 0 && commentCount > ratingsCount) {
+                // Eğer yanlışlıkla daha büyük bir sayı bulduysak (ID vb.), takas et
+                const temp = ratingsCount;
+                ratingsCount = commentCount;
+                commentCount = temp;
+            }
 
             return {
                 extracted_data: {
@@ -58,7 +66,7 @@
                     total_ratings: ratingsCount || 0,
                     total_reviews: commentCount || 0,
                     photo_reviews_count: hbPhotoCount || 0,
-                    debug_source: 'HB:V17:' + dbg
+                    debug_source: 'HB:V18:' + dbg
                 }
             };
         }
