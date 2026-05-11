@@ -1,5 +1,5 @@
-// Decepta AI - DOM Extractor v14
-// Hepsiburada + Trendyol Kesin Çözüm - v1.3.8
+// Decepta AI - DOM Extractor v15
+// Hepsiburada + Trendyol Kesin Çözüm - v1.3.9
 (() => {
     try {
         const url = window.location.href;
@@ -31,22 +31,25 @@
             if (m) ratingsCount = parseInt(m[1]);
         }
 
-        // 2. HEPSİBURADA ÖZEL (v14)
+        // 2. HEPSİBURADA ÖZEL (v15 - Wildcard Regex)
         if (isHepsiburada) {
-            // A. HTML üzerinden ham veri taraması (JSON yapısını regex ile parçalamadan oku)
-            const mR = html.match(/"productReviews"\s*:\s*\{\s*"totalReviewCount"\s*:\s*(\d+)/);
+            // A. HTML JSON Taraması (Wildcard ile esnekleştirildi)
+            // "productReviews" bloğu içinde "totalReviewCount" ara
+            const mR = html.match(/"productReviews"[\s\S]{0,1000}?"totalReviewCount"\s*:\s*(\d+)/);
             if (mR) { commentCount = parseInt(mR[1]); dbg += "R"; }
             
-            const mP = html.match(/"mediaSummary"\s*:\s*\{\s*"approvedMediaReviewCount"\s*:\s*(\d+)/);
+            // "mediaSummary" bloğu içinde "approvedMediaReviewCount" ara
+            const mP = html.match(/"mediaSummary"[\s\S]{0,1000}?"approvedMediaReviewCount"\s*:\s*(\d+)/);
             if (mP) { hbPhotoCount = parseInt(mP[1]); dbg += "P"; }
 
-            // B. Metin Üzerinden Arama (Yorumlar (26) vb.)
+            // B. Metin Üzerinden Çok Esnek Arama
             if (commentCount === 0) {
-                const mY = html.match(/Yorumlar\s*\((\d+)\)/i) || bodyText.match(/Yorumlar\s*\((\d+)\)/i);
+                // "Yorumlar (26)" veya "Yorumlar 26" veya "26 Yorum"
+                const mY = bodyText.match(/Yorumlar?.*?(\d+)/i) || html.match(/Yorumlar?.*?(\d+)/i);
                 if (mY) { commentCount = parseInt(mY[1]); dbg += "T"; }
             }
             if (hbPhotoCount === 0) {
-                const mF = html.match(/Fotoğraflı\s*\((\d+)\)/i) || bodyText.match(/Fotoğraflı\s*\((\d+)\)/i);
+                const mF = bodyText.match(/Foto.*?(\d+)/i) || html.match(/Foto.*?(\d+)/i);
                 if (mF) { hbPhotoCount = parseInt(mF[1]); }
             }
 
@@ -60,7 +63,7 @@
                     total_ratings: ratingsCount || 0,
                     total_reviews: commentCount || 0,
                     photo_reviews_count: hbPhotoCount || 0,
-                    debug_source: 'HB:V14:' + dbg
+                    debug_source: 'HB:V15:' + dbg
                 }
             };
         }
