@@ -1,5 +1,5 @@
-// Decepta AI - DOM Extractor v15
-// Hepsiburada + Trendyol Kesin Çözüm - v1.3.9
+// Decepta AI - DOM Extractor v16
+// Hepsiburada + Trendyol Kesin Çözüm - v1.3.10
 (() => {
     try {
         const url = window.location.href;
@@ -10,17 +10,12 @@
         let score = 0, ratingsCount = 0, commentCount = 0, hbPhotoCount = 0;
         let dbg = "";
 
-        // 1. Metadata (Puan ve Değerlendirme)
-        const scoreEls = ['.pr-in-rnr-v', '[class*="RatingPointer"]', '[itemprop="ratingValue"]', '.rnr-avg-rnr-v'];
+        // 1. Metadata
+        const scoreEls = ['.pr-in-rnr-v', '[class*="RatingPointer"]', '[itemprop="ratingValue"]'];
         for (const sel of scoreEls) {
             const el = document.querySelector(sel);
             if (el) { score = parseFloat((el.getAttribute('content') || el.innerText || '').replace(',', '.')); if (score > 0) break; }
         }
-        if (score === 0) {
-            const m = bodyText.match(/(\d[.,]\d)\s*(?:puan|yıldız|★)/i);
-            if (m) score = parseFloat(m[1].replace(',', '.'));
-        }
-
         const countEls = ['.rvw-cnt-tx', '[itemprop="ratingCount"]', '.hermes-ReviewSummary-module-ratingCount'];
         for (const sel of countEls) {
             const el = document.querySelector(sel);
@@ -31,29 +26,31 @@
             if (m) ratingsCount = parseInt(m[1]);
         }
 
-        // 2. HEPSİBURADA ÖZEL (v15 - Wildcard Regex)
+        // 2. HEPSİBURADA ÖZEL (v16 - Hassas Ayar)
         if (isHepsiburada) {
-            // A. HTML JSON Taraması (Wildcard ile esnekleştirildi)
-            // "productReviews" bloğu içinde "totalReviewCount" ara
-            const mR = html.match(/"productReviews"[\s\S]{0,1000}?"totalReviewCount"\s*:\s*(\d+)/);
+            // A. Hassas JSON Taraması (Blok sınırlı)
+            // Sadece nesne içindeki (parantez/süslü parantez arası) ilk sayıyı alır
+            const mR = html.match(/"productReviews"\s*:\s*\{[^{}]*?"totalReviewCount"\s*:\s*(\d+)/);
             if (mR) { commentCount = parseInt(mR[1]); dbg += "R"; }
             
-            // "mediaSummary" bloğu içinde "approvedMediaReviewCount" ara
-            const mP = html.match(/"mediaSummary"[\s\S]{0,1000}?"approvedMediaReviewCount"\s*:\s*(\d+)/);
+            const mP = html.match(/"mediaSummary"\s*:\s*\{[^{}]*?"approvedMediaReviewCount"\s*:\s*(\d+)/);
             if (mP) { hbPhotoCount = parseInt(mP[1]); dbg += "P"; }
 
-            // B. Metin Üzerinden Çok Esnek Arama
+            // B. Hassas Metin Taraması (Sadece parantezli yapılar)
             if (commentCount === 0) {
-                // "Yorumlar (26)" veya "Yorumlar 26" veya "26 Yorum"
-                const mY = bodyText.match(/Yorumlar?.*?(\d+)/i) || html.match(/Yorumlar?.*?(\d+)/i);
+                const mY = bodyText.match(/Yorum(?:lar)?\s*\((\d+)\)/i);
                 if (mY) { commentCount = parseInt(mY[1]); dbg += "T"; }
             }
             if (hbPhotoCount === 0) {
-                const mF = bodyText.match(/Foto.*?(\d+)/i) || html.match(/Foto.*?(\d+)/i);
+                const mF = bodyText.match(/Foto(?:ğ|g)rafl[ıi]\s*\((\d+)\)/i);
                 if (mF) { hbPhotoCount = parseInt(mF[1]); }
             }
 
-            // C. Fallbacks
+            // C. Güvenlik ve Fallback
+            // 1 Milyondan fazla yorum HB için imkansızdır, garbage veriyi temizle
+            if (commentCount > 1000000) commentCount = 0;
+            if (hbPhotoCount > 1000000) hbPhotoCount = 0;
+
             if (commentCount === 0 && ratingsCount > 0) { commentCount = ratingsCount; dbg += "F"; }
             if (ratingsCount > 0 && commentCount > ratingsCount) commentCount = ratingsCount;
 
@@ -63,7 +60,7 @@
                     total_ratings: ratingsCount || 0,
                     total_reviews: commentCount || 0,
                     photo_reviews_count: hbPhotoCount || 0,
-                    debug_source: 'HB:V15:' + dbg
+                    debug_source: 'HB:V16:' + dbg
                 }
             };
         }
