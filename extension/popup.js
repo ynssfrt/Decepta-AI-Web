@@ -116,7 +116,7 @@ document.getElementById('scan-btn').addEventListener('click', async () => {
             const ed = pageData.extracted_data;
             const photoCount = ed.photo_reviews_count || 0;
             let debugHtml = `
-                <b>🔍 Eklenti Çıktısı (v9 - 1.3.3):</b><br>
+                <b>🔍 Eklenti Çıktısı (v10 - 1.3.4):</b><br>
                 📊 Puan: <b>${ed.score}</b> (${ed.debug_source || '?'})<br>
                 📝 Değerlendirme: <b>${ed.total_ratings}</b><br>
                 💬 Yorum: <b>${ed.total_reviews}</b><br>
