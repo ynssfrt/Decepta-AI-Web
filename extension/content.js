@@ -330,115 +330,83 @@
             }
         }
 
-        // ========== HEPSİBURADA: YORUM SAYISI ==========
+        // ========== HEPSİBURADA: ÖZEL AYIKLAMA (v8) ==========
         if (isHepsiburada) {
+            // Başlangıç değerlerini sıfırla
             commentCount = 0;
+            let hbPhotoCount = 0;
             let hbSuccess = false;
-            let hbPhotoFound = false;
-            
-            // ======= YÖNTEM 0: bodyText'te spesifik tab etiketlerini ara =======
-            const yorumluMatch = bodyText.match(/Yorumlu\s*\((\d[\d.]*)\)/);
-            if (yorumluMatch) {
-                commentCount = parseInt(yorumluMatch[1].replace(/\./g, ''));
-                hbSuccess = true;
-            }
-            
-            const fotoluMatch = bodyText.match(/Foto(?:ğ|g)rafl[ıi]\s*\((\d[\d.]*)\)/);
-            if (fotoluMatch) {
-                window.__hb_photoCount = parseInt(fotoluMatch[1].replace(/\./g, ''));
-                hbPhotoFound = true;
-            }
-            
-            // ======= YÖNTEM 1: window objesi =======
-            if (!hbSuccess && typeof window.__hb_commentCount !== 'undefined') {
-                commentCount = window.__hb_commentCount;
-                hbSuccess = true;
-            }
-            
-            // ======= YÖNTEM 2: Script bloğu =======
+
+            // 1. ADIM: Sayfadaki Script Verisini Ayıkla (EN GÜVENİLİR)
             const scripts = document.querySelectorAll('script');
             for (let i = 0; i < scripts.length; i++) {
                 const txt = scripts[i].textContent || '';
                 if (txt.includes('__HB_REVIEWS_INITIAL_STATE__')) {
-                    const stateIndex = txt.indexOf('__HB_REVIEWS_INITIAL_STATE__');
-                    const stateTxt = txt.substring(stateIndex);
-                    
-                    // --- Fotoğraf sayısı ---
-                    if (!hbPhotoFound) {
-                        const mediaMatch = stateTxt.match(/"(?:approvedMediaReviewCount|totalPhotoCount)"\s*:\s*(\d+)/);
-                        if (mediaMatch) {
-                            window.__hb_photoCount = parseInt(mediaMatch[1]);
-                            hbPhotoFound = true;
-                        }
-                    }
-                    
-                    // --- Yorum sayısı ---
-                    // HB'de ratingSummary.totalReviewCount = Değerlendirme (52)
-                    //       productReviews.totalReviewCount = Yazılı yorum (26) [FARKLI!]
-                    // İkisi de "totalReviewCount" ama ratingSummary ÖNCE gelir.
-                    // Bu yüzden productReviews bloğundaki değeri AYRI çekmemiz lazım.
-                    if (!hbSuccess) {
-                        // ratingSummary'deki totalReviewCount (52) — bu Değerlendirme
-                        let ratingSummaryCount = 0;
-                        const rsIndex = stateTxt.indexOf('"ratingSummary"');
-                        if (rsIndex > -1) {
-                            const rsBlock = stateTxt.substring(rsIndex, rsIndex + 500);
-                            const rsMatch = rsBlock.match(/"totalReviewCount"\s*:\s*(\d+)/);
-                            if (rsMatch) ratingSummaryCount = parseInt(rsMatch[1]);
-                        }
-                        
-                        // productReviews'deki totalReviewCount (26) — bu Yazılı Yorum
-                        let productReviewsCount = 0;
-                        const prIndex = stateTxt.indexOf('"productReviews"');
-                        if (prIndex > -1) {
-                            const prBlock = stateTxt.substring(prIndex, prIndex + 500);
-                            const prMatch = prBlock.match(/"totalReviewCount"\s*:\s*(\d+)/);
-                            if (prMatch) productReviewsCount = parseInt(prMatch[1]);
-                        }
-                        
-                        if (ratingSummaryCount > 0 && productReviewsCount > 0 && productReviewsCount !== ratingSummaryCount) {
-                            // İkisi farklıysa, küçük olan = yazılı yorum
-                            commentCount = Math.min(ratingSummaryCount, productReviewsCount);
-                            hbSuccess = true;
-                        } else if (productReviewsCount > 0) {
-                            commentCount = productReviewsCount;
-                            hbSuccess = true;
-                        } else if (ratingSummaryCount > 0) {
-                            // Tek değer varsa pagination ile doğrulama yap
-                            // pageCount ve mevcut sayfadaki kart sayısından tahmini yorum sayısı hesapla
-                            const pageCountMatch = stateTxt.match(/"pageCount"\s*:\s*(\d+)/);
-                            const pageSizeMatch = stateTxt.match(/"pageSize"\s*:\s*(\d+)/);
-                            if (pageCountMatch) {
-                                const pageCount = parseInt(pageCountMatch[1]);
-                                const pageSize = pageSizeMatch ? parseInt(pageSizeMatch[1]) : 5;
-                                // Son sayfa tam dolmayabilir, ama bu bir üst sınır tahmindir
-                                const estimatedReviews = pageCount * pageSize;
-                                // Eğer tahmin Değerlendirme'den farklıysa, tahmini kullan
-                                if (estimatedReviews < ratingSummaryCount) {
-                                    commentCount = estimatedReviews;
-                                    hbSuccess = true;
-                                }
+                    try {
+                        // Regex ile JSON bloğunu temizle ve al
+                        const jsonMatch = txt.match(/__HB_REVIEWS_INITIAL_STATE__\s*=\s*(\{[\s\S]*?\});/);
+                        if (jsonMatch) {
+                            const state = JSON.parse(jsonMatch[1]);
+                            
+                            // Değerlendirme (Rating) Sayısı -> 53
+                            if (state.ratingSummary && state.ratingSummary.totalReviewCount) {
+                                ratingsCount = parseInt(state.ratingSummary.totalReviewCount);
                             }
                             
-                            if (!hbSuccess) {
-                                commentCount = ratingSummaryCount;
+                            // Yazılı Yorum Sayısı -> 26
+                            if (state.productReviews && state.productReviews.totalReviewCount) {
+                                commentCount = parseInt(state.productReviews.totalReviewCount);
                                 hbSuccess = true;
                             }
+                            
+                            // Fotoğraflı Yorum Sayısı -> 4
+                            if (state.mediaSummary && state.mediaSummary.approvedMediaReviewCount) {
+                                hbPhotoCount = parseInt(state.mediaSummary.approvedMediaReviewCount);
+                            } else if (state.productReviews && state.productReviews.mediaCount) {
+                                hbPhotoCount = parseInt(state.productReviews.mediaCount);
+                            }
                         }
+                    } catch (e) {
+                        // JSON Parse hatası durumunda eski regex fallback
+                        const prMatch = txt.match(/"productReviews"\s*:\s*\{[^}]*?"totalReviewCount"\s*:\s*(\d+)/);
+                        if (prMatch) { commentCount = parseInt(prMatch[1]); hbSuccess = true; }
+                        
+                        const mediaMatch = txt.match(/"approvedMediaReviewCount"\s*:\s*(\d+)/) || txt.match(/"mediaCount"\s*:\s*(\d+)/);
+                        if (mediaMatch) hbPhotoCount = parseInt(mediaMatch[1]);
                     }
-                    
                     break;
                 }
             }
-            
-            // ======= YÖNTEM 3: "(52 Değerlendirme)" metninden son çare =======
-            if (!hbSuccess) {
-                const evalMatch = bodyText.match(/\((\d[\d.]*)\s*[Dd]eğerlendirme\)/);
-                if (evalMatch) {
-                    commentCount = parseInt(evalMatch[1].replace(/\./g, ''));
-                    hbSuccess = true;
+
+            // 2. ADIM: Pagination Metninden Ayıkla (26'yı bulmak için)
+            // Örn: "1 - 10 / 26" veya "sayfa 1 / 6"
+            if (!hbSuccess || commentCount === 0) {
+                const pagText = bodyText.match(/(\d+)\s*-\s*(\d+)\s*\/\s*(\d+)/) || bodyText.match(/toplam\s*(\d+)\s*yorum/i);
+                if (pagText) {
+                    const val = parseInt(pagText[3] || pagText[1]);
+                    if (val > 0 && val < ratingsCount) {
+                        commentCount = val;
+                        hbSuccess = true;
+                    }
                 }
             }
+
+            // 3. ADIM: DOM'dan Sayma (Fotoğrafları bulmak için)
+            // Hepsiburada'da fotoğraflar genelde bir galeri içindedir
+            if (hbPhotoCount === 0) {
+                const galleryImgs = document.querySelectorAll('[class*="ImageGallery"] img, [class*="media-gallery"] img, [class*="review-image"] img');
+                const photoSet = new Set();
+                galleryImgs.forEach(img => {
+                    const src = img.src || '';
+                    if (src && !src.includes('avatar') && !src.includes('star') && (img.width > 40 || img.naturalWidth > 40)) {
+                        photoSet.add(src);
+                    }
+                });
+                if (photoSet.size > 0) hbPhotoCount = photoSet.size;
+            }
+
+            // Değerleri global değişkenlere ata
+            if (hbPhotoCount > 0) window.__hb_photoCount = hbPhotoCount;
         }
         
         // Fallback (sadece Trendyol vb. için — HB zaten yukarıda ele alındı)
