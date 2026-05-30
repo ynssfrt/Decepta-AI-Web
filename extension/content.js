@@ -1,5 +1,6 @@
-// Decepta AI - DOM Extractor v7
-// Trendyol (Puzzle framework) + Hepsiburada (Hermes) uyumlu
+// Decepta AI - DOM Extractor v8
+// Trendyol: /yorumlar sayfası (auto-scroll sonrası tam sayım)
+// Hepsiburada: -yorumlari sayfası (pagination destekli foto sayımı)
 // Değerlendirme (yıldız) ve Yorum (yazılı) sayıları ayrı ayrı çekilir
 (() => {
     try {
@@ -7,6 +8,7 @@
         const bodyText = document.body.innerText;
         const isTrendyol = url.includes('trendyol.com');
         const isHepsiburada = url.includes('hepsiburada.com');
+        const isN11 = url.includes('n11.com');
         
         let score = 0;
         let ratingsCount = 0;
@@ -87,6 +89,35 @@
         }
 
         // ========== 2. DOM'dan Yorum Metinleri & Görseller ==========
+        if (comments.length === 0 && isN11) {
+            try {
+                const cards = document.querySelectorAll('.review-cart-wrapper__list > .review-card, .review-cart-wrapper__list > .card-wrapper, .card-wrapper.review-card.rounded');
+                cards.forEach(el => {
+                    const textEl = el.querySelector('.card-detail__contents');
+                    const txt = textEl ? textEl.innerText.trim() : "";
+                    
+                    const imgs = [];
+                    el.querySelectorAll('img').forEach(img => {
+                        if (isReviewPhoto(img)) {
+                            const src = img.src || img.dataset?.src;
+                            if (src && !imgs.includes(src)) imgs.push(src);
+                        }
+                    });
+                    
+                    if (txt.length > 2) {
+                        if (!comments.includes(txt)) {
+                            comments.push(txt);
+                            detailedReviews.push({ text: txt, images: imgs });
+                        }
+                    } else if (imgs.length > 0) {
+                        detailedReviews.push({ text: "", images: imgs });
+                    }
+                });
+            } catch(e) {
+                console.error("n11 DOM comments extraction error:", e);
+            }
+        }
+
         if (comments.length === 0) {
             // Trendyol (yeni Puzzle framework): .review, .review-comment, .comment-text
             // Hepsiburada (Hermes): [class*="ReviewCard"], [class*="hermes-ReviewCard"]
@@ -102,6 +133,12 @@
                 // Hepsiburada Hermes
                 '[class*="hermes-ReviewCard-module"]',
                 '[class*="ReviewCard"]',
+                // n11 Yorum Seçicileri
+                '.comment',
+                '.commentDetail',
+                'li.comment',
+                '.review-card',
+                '.card-wrapper.review-card'
             ];
             
             for (const sel of containerSelectors) {
@@ -118,6 +155,12 @@
                             '[itemprop="description"]',
                             '[class*="review-comment"]',
                             '[class*="ReviewCard-module"] p',
+                            '[class*="ReviewCard"] span[style*="text-align:start"]:not([class])',
+                            'span[style*="text-align:start"]:not([class])',
+                            // n11 Yorum Metni Seçicileri
+                            '.card-detail__contents',
+                            '.commentText',
+                            '.commentDetail p',
                             'p',
                         ];
                         let txt = "";
@@ -134,9 +177,23 @@
                         const isReviewPhoto = (img) => {
                             const src = img.src || img.dataset?.src || '';
                             if (!src || src.startsWith('data:')) return false;
-                            // Küçük ikonları (star, badge, avatar) dışla
-                            const excludePatterns = ['avatar', 'star', 'icon', 'svg', 'badge', 'logo', 'emoji', 'placeholder'];
-                            if (excludePatterns.some(p => src.toLowerCase().includes(p))) return false;
+                            
+                            const lowerSrc = src.toLowerCase();
+                            
+                            // Hepsiburada ve Trendyol için whitelist (UI ikonlarını, yıldızları vb. kesinlikle dışlar)
+                            if (isHepsiburada) {
+                                return lowerSrc.includes('usercontents') || lowerSrc.includes('review-images');
+                            }
+                            if (isTrendyol) {
+                                return lowerSrc.includes('ty-images.com') || lowerSrc.includes('review-images') || lowerSrc.includes('usercontents');
+                            }
+                            if (isN11) {
+                                return lowerSrc.includes('n11scdn') || lowerSrc.includes('akamaized.net') || lowerSrc.includes('n11images.com') || lowerSrc.includes('review-images') || lowerSrc.includes('usercontents');
+                            }
+                            
+                            // Küçük ikonları (star, badge, avatar) dışla (diğer siteler için fallback)
+                            const excludePatterns = ['avatar', 'star', 'icon', 'svg', 'badge', 'logo', 'emoji', 'placeholder', 'thumbs'];
+                            if (excludePatterns.some(p => lowerSrc.includes(p))) return false;
                             // Çok küçük görselleri dışla (genelde ikon/star olur)
                             const w = img.naturalWidth || img.width || 0;
                             const h = img.naturalHeight || img.height || 0;
@@ -152,13 +209,15 @@
                             }
                         });
 
-                        if (txt.length > 2 || imgs.length > 0) {
-                            // Metin yoksa ama görsel varsa → "Sadece Görsel" olarak işaretle
-                            const finalTxt = txt.length > 2 ? txt : (imgs.length > 0 ? '[Sadece Görsel]' : '');
-                            if (finalTxt && !comments.includes(finalTxt)) {
-                                comments.push(finalTxt);
-                                detailedReviews.push({ text: finalTxt, images: imgs });
+                        if (txt.length > 2) {
+                            if (!comments.includes(txt)) {
+                                comments.push(txt);
+                                detailedReviews.push({ text: txt, images: imgs });
                             }
+                        } else if (imgs.length > 0) {
+                            // Metin yok ama gerçek görsel var -> comments listesine "[Sadece Görsel]" eklemiyoruz 
+                            // (arka plandaki duplicate/kopya bot analizini bozmasın), detailedReviews'e boş metinle ekliyoruz
+                            detailedReviews.push({ text: "", images: imgs });
                         }
                     });
                     if (comments.length > 0) break;
@@ -174,6 +233,10 @@
                 // Hepsiburada
                 '[class*="RatingPointer"]', '[class*="ratingPointer"]',
                 '[itemprop="ratingValue"]',
+                // n11 puan seçicileri
+                '.ratingText',
+                '.ratingCont .rating',
+                '.proDetailArea .ratingText'
             ];
             for (const sel of scoreEls) {
                 const el = document.querySelector(sel);
@@ -195,6 +258,11 @@
                 '[class*="ReviewSummary"] [class*="count"]',
                 '[itemprop="ratingCount"]',
                 '[itemprop="reviewCount"]',
+                // n11 değerlendirme sayısı seçicileri
+                '.reviewNum',
+                '.reviewCount',
+                'a[href="#reviews"] span',
+                '.selected[href="#reviews"] span'
             ];
             for (const sel of countEls) {
                 const el = document.querySelector(sel);
@@ -311,91 +379,214 @@
             }
         }
 
-        // Hepsiburada'da "Yorum" yerine "Değerlendirme" kullanılıyor
-        // Eğer commentCount hâlâ 0 ise ve ratingsCount var ise, değerlendirme sayısını yorum sayısı olarak kullan
-        if (commentCount === 0 && isHepsiburada && ratingsCount > 0) {
+        // ========== HEPSİBURADA: Yorum sayısı ==========
+        // DİKKAT: HB yıldız-only değerlendirmeler için de ReviewCard render eder!
+        // Gerçek yorum sayısı popup.js tarafından tüm sayfalar taranarak override edilir.
+        // Burada sadece mevcut sayfadaki metinli kartları sayıyoruz (başlangıç değeri).
+        if (isHepsiburada && commentCount === 0) {
+            const allCards = document.querySelectorAll('[class*="ReviewCard"]');
+            const cards = Array.from(allCards).filter(card => {
+                return !card.parentElement?.className?.includes('ReviewCard');
+            });
+            let textCardCount = 0;
+            cards.forEach(card => {
+                const userNameEl = card.querySelector('meta[content]');
+                const userName = userNameEl ? userNameEl.getAttribute('content').trim() : '';
+
+                let reviewDate = '';
+                const spanEls = card.querySelectorAll('span[content]');
+                for (const span of spanEls) {
+                    const contentVal = span.getAttribute('content') || '';
+                    if (contentVal.includes('-') && contentVal.length === 10) {
+                        reviewDate = contentVal.trim();
+                        break;
+                    }
+                }
+
+                if (!userName && !reviewDate) return;
+
+                const textSelectors = [
+                    '[itemprop="description"]',
+                    '[class*="review-comment"]',
+                    '[class*="ReviewCard-module"] p',
+                    'span[style*="text-align:start"]:not([class])',
+                    'p'
+                ];
+                let hasText = false;
+                for (const sel of textSelectors) {
+                    const textEl = card.querySelector(sel);
+                    if (textEl && textEl.innerText.trim().length > 2) {
+                        hasText = true;
+                        break;
+                    }
+                }
+                
+                // Yorumun en az bir adet fotoğraf içerdiğini doğrulamak için tırnak genişlik/yükseklik seçicilerini kontrol et
+                const h64Count = card.querySelectorAll('[height="64px"]').length;
+                const w80Count = card.querySelectorAll('[width="80"]').length;
+                let hasPhoto = h64Count > 0 || w80Count > 0;
+                if (!hasPhoto) {
+                    card.querySelectorAll('img').forEach(img => {
+                        const src = img.src || img.dataset?.src || '';
+                        if (src.includes('usercontents') || src.includes('review-images')) hasPhoto = true;
+                    });
+                }
+                
+                if (hasText || hasPhoto) textCardCount++;
+            });
+            if (textCardCount > 0) commentCount = textCardCount;
+        }
+        
+        // Yorum sayısı asla değerlendirme sayısını geçemez
+        if (commentCount > 0 && ratingsCount > 0 && commentCount > ratingsCount) {
             commentCount = ratingsCount;
         }
         
         // Fallback: commentCount bulunamadıysa, DOM'daki yorum adedini kullan
         if (commentCount === 0) commentCount = comments.length;
 
+        // ========== 7.5. n11 Özel İstatistik Çekimi ==========
+        if (isN11) {
+            try {
+                const scoreEl = document.querySelector('span.product-review-statistics-score__big');
+                if (scoreEl) {
+                    const val = parseFloat(scoreEl.innerText.trim());
+                    if (val > 0 && val <= 5) {
+                        score = val;
+                        debug_source = 'DOM:n11-statistics-score';
+                    }
+                }
+                const ratingsEl = document.querySelector('p.product-review-statistics__review-desc');
+                if (ratingsEl) {
+                    ratingsCount = parseInt(ratingsEl.innerText.replace(/\D/g, ''));
+                }
+                const commentEl = document.querySelector('span.product-review-statistics__review-desc');
+                if (commentEl) {
+                    commentCount = parseInt(commentEl.innerText.replace(/\D/g, ''));
+                }
+            } catch(e) {
+                console.error("n11 statistics extraction error:", e);
+            }
+        }
+
         // ========== 8. FOTOĞRAFLI YORUM SAYISI ==========
+        // NOT: popup.js'den önce:
+        //   - Trendyol: /yorumlar sayfasına yönlendirilmiş + auto-scroll yapılmış
+        //   - Hepsiburada: -yorumlari sayfasına yönlendirilmiş (popup.js pagination ile tüm sayfaları ayrıca tarar)
         let photoReviewsCount = 0;
         
-        // Yöntem A: detailedReviews içinden (Trendyol kart içi görseller)
+        // Görsel filtresi (ikon, avatar, star dışla)
+        const isReviewPhoto = (img) => {
+            const src = img.src || img.dataset?.src || '';
+            if (!src || src.startsWith('data:')) return false;
+            const excludePatterns = ['avatar', 'star', 'icon', 'svg', 'badge', 'logo', 'emoji', 'placeholder'];
+            if (excludePatterns.some(p => src.toLowerCase().includes(p))) return false;
+            const w = img.naturalWidth || img.width || 0;
+            const h = img.naturalHeight || img.height || 0;
+            if ((w > 0 && w < 40) || (h > 0 && h < 40)) return false;
+            return true;
+        };
+
+        // Yöntem A: detailedReviews içinden (Trendyol: scroll sonrası tam yüklü kartlar)
         photoReviewsCount = detailedReviews.filter(r => r.images && r.images.length > 0).length;
         
-        // Yöntem B: Hepsiburada "Kullanıcı fotoğraf ve videoları" galerisi
-        if (photoReviewsCount === 0) {
-            // HB'de fotoğraflar yorum kartlarının dışında ayrı bir galeri bölümünde gösteriliyor
-            // Bu galeri genellikle "Kullanıcı fotoğraf" başlığı altında
-            
-            // Galeri container'ını bul (class*="MediaGallery" veya "userMedia" veya başlıktan)
-            const gallerySelectors = [
-                '[class*="MediaGallery"]',
-                '[class*="mediaGallery"]', 
-                '[class*="user-media"]',
-                '[class*="userMedia"]',
-                '[class*="CustomerMedia"]',
-                '[class*="customerMedia"]',
-                '[class*="review-media-gallery"]',
-            ];
-            
-            let galleryEl = null;
-            for (const sel of gallerySelectors) {
-                galleryEl = document.querySelector(sel);
-                if (galleryEl) break;
-            }
-            
-            // Galeri bulunamadıysa "Kullanıcı fotoğraf" başlığını ara
-            if (!galleryEl) {
-                const allHeadings = document.querySelectorAll('h2, h3, h4, div, span');
-                for (const heading of allHeadings) {
-                    const text = (heading.innerText || '').trim();
-                    if (text.match(/kullanıcı\s*(fotoğraf|foto|medya)/i) || text.match(/müşteri\s*(fotoğraf|foto)/i)) {
-                        // Başlığın parent veya sibling container'ını al
-                        galleryEl = heading.parentElement;
+        // Yöntem B: HB özel — React thumbnail varlığı veya fallback resim kontrolü
+        if (photoReviewsCount === 0 && isHepsiburada) {
+            const allCards = document.querySelectorAll('[class*="ReviewCard"]');
+            const cards = Array.from(allCards).filter(card => {
+                return !card.parentElement?.className?.includes('ReviewCard');
+            });
+            cards.forEach(card => {
+                const userNameEl = card.querySelector('meta[content]');
+                const userName = userNameEl ? userNameEl.getAttribute('content').trim() : '';
+
+                let reviewDate = '';
+                const spanEls = card.querySelectorAll('span[content]');
+                for (const span of spanEls) {
+                    const contentVal = span.getAttribute('content') || '';
+                    if (contentVal.includes('-') && contentVal.length === 10) {
+                        reviewDate = contentVal.trim();
                         break;
                     }
                 }
-            }
-            
-            if (galleryEl) {
-                // Galeri içindeki görselleri say
-                const galleryImgs = galleryEl.querySelectorAll('img');
-                const uniqueGallerySrcs = new Set();
-                galleryImgs.forEach(img => {
-                    const src = img.src || img.dataset?.src || '';
-                    if (src && !src.startsWith('data:') && !src.includes('avatar') && !src.includes('icon')) {
-                        // Küçük ikonları dışla
-                        const w = img.naturalWidth || img.width || 100;
-                        if (w >= 40) {
-                            uniqueGallerySrcs.add(src);
-                        }
-                    }
+
+                if (!userName && !reviewDate) return;
+
+                // Yorumun en az bir adet fotoğraf içerdiğini doğrulamak için tırnak genişlik/yükseklik seçicilerini kontrol et
+                const h64Count = card.querySelectorAll('[height="64px"]').length;
+                const w80Count = card.querySelectorAll('[width="80"]').length;
+                let hasPhoto = h64Count > 0 || w80Count > 0;
+                if (!hasPhoto) {
+                    card.querySelectorAll('img').forEach(img => {
+                        const src = img.src || img.dataset?.src || '';
+                        if (src.includes('usercontents') || src.includes('review-images')) hasPhoto = true;
+                    });
+                }
+                if (hasPhoto) {
+                    photoReviewsCount++;
+                }
+            });
+        }
+        // Yöntem B.5: n11 özel — Yorum kartlarını tara ve fotoğraflı olanları say
+        if (photoReviewsCount === 0 && isN11) {
+            try {
+                const cards = document.querySelectorAll('.review-cart-wrapper__list > .review-card, .review-cart-wrapper__list > .card-wrapper, .card-wrapper.review-card.rounded');
+                cards.forEach(card => {
+                    const imgs = card.querySelectorAll('img');
+                    const hasPhoto = Array.from(imgs).some(isReviewPhoto);
+                    if (hasPhoto) photoReviewsCount++;
                 });
-                photoReviewsCount = uniqueGallerySrcs.size;
+            } catch(e) {
+                console.error("n11 photo counting error:", e);
+            }
+        }
+
+        // Yöntem C: Trendyol — yorum kartlarını tek tek tara (img element kontrolü)
+        if (photoReviewsCount === 0 && !isHepsiburada) {
+            const reviewCardSelectors = [
+                '.rnr-com-w',
+                '.pr-rvw-crd',
+                '[class*="review-card"]',
+                '[class*="reviewCard"]',
+                '.review',
+            ];
+            
+            for (const sel of reviewCardSelectors) {
+                const cards = document.querySelectorAll(sel);
+                if (cards.length > 0) {
+                    cards.forEach(card => {
+                        const imgs = card.querySelectorAll('img');
+                        const hasPhoto = Array.from(imgs).some(isReviewPhoto);
+                        if (hasPhoto) photoReviewsCount++;
+                    });
+                    break;
+                }
             }
         }
         
-        // Yöntem C: Genel fallback — sayfadaki tüm yorum bölgesinde görsel ara
+        // Yöntem D: Genel fallback — tüm yorum bölgelerinde görsel ara
         if (photoReviewsCount === 0) {
-            // Sayfadaki "yorum" veya "review" class'lı bölgelerdeki görselleri say
-            const reviewSections = document.querySelectorAll('[class*="review"] img, [class*="Review"] img, [class*="rvw"] img, [class*="comment"] img, [class*="Comment"] img');
             const uniqueSrcs = new Set();
-            reviewSections.forEach(img => {
-                const src = img.src || '';
-                if (src && !src.includes('avatar') && !src.includes('star') && !src.includes('icon') && !src.includes('svg') && !src.startsWith('data:')) {
-                    const w = img.naturalWidth || img.width || 100;
-                    if (w >= 40) {
-                        uniqueSrcs.add(src);
-                    }
+            document.querySelectorAll('[class*="review"] img, [class*="Review"] img, [class*="rvw"] img, [class*="comment"] img, [class*="Comment"] img').forEach(img => {
+                if (isReviewPhoto(img)) {
+                    const src = img.src || '';
+                    if (src) uniqueSrcs.add(src);
                 }
             });
-            if (uniqueSrcs.size > 0) {
-                photoReviewsCount = uniqueSrcs.size;
-            }
+            if (uniqueSrcs.size > 0) photoReviewsCount = uniqueSrcs.size;
+        }
+
+        // Yöntem E: HB özel — sayfa script'indeki template URL'lerinden fotoğraf sayısı
+        // ReactVirtualized lazy-load nedeniyle DOM'da görünmeyen fotoğraflar için.
+        // Hepsiburada review sayfası, usercontents/s/0/{size}/uuid.jpg URL'lerini
+        // script state'ine önceden gömüyor — her eşsiz UUID bir kullanıcı fotoğrafı.
+        if (photoReviewsCount === 0 && isHepsiburada) {
+            try {
+                const html = document.documentElement.innerHTML;
+                const matches = html.match(/usercontents\/s\/0\/\{size\}\/([a-f0-9-]+)\.jpg/g) || [];
+                const uniqueIds = new Set(matches.map(m => m.split('/').pop()));
+                if (uniqueIds.size > 0) photoReviewsCount = uniqueIds.size;
+            } catch(e) {}
         }
 
         // ========== SONUÇ ==========
@@ -414,7 +605,7 @@
             text: bodyText
         };
         
-        console.log('[Decepta AI v7] Sonuç:', JSON.stringify(result.extracted_data, null, 2));
+        console.log('[Decepta AI v8] Sonuç:', JSON.stringify(result.extracted_data, null, 2));
         return result;
         
     } catch (e) {

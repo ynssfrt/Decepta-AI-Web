@@ -1,120 +1,124 @@
-document.getElementById('scan-btn').addEventListener('click', async () => {
+// Decepta AI - Popup v9
+// Trendyol: /yorumlar sayfasına yönlendir + auto-scroll
+// Hepsiburada: -yorumlari sayfasına yönlendir + pagination tarama
+// Cache: Tarama sonuçları popup kapansa bile korunur
+
+let pollInterval = null;
+
+// ========== SAYFA AÇILDIĞINDA CACHE KONTROL ==========
+(async function loadCachedResults() {
+    try {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        const pageUrl = tab.url.split('?')[0].split('#')[0]; // Normalize URL
+        const cacheKey = 'decepta_cache_' + pageUrl;
+        
+        const cached = await chrome.storage.local.get(cacheKey);
+        if (cached[cacheKey]) {
+            handleCacheState(cached[cacheKey], tab.id);
+        }
+    } catch(e) {
+        console.log('[Decepta AI] Cache yükleme hatası:', e);
+    }
+})();
+
+function handleCacheState(data, tabId) {
     const btn = document.getElementById('scan-btn');
+    const rescanBtn = document.getElementById('rescan-btn');
     const loading = document.getElementById('loading');
     const success = document.getElementById('success');
     const error = document.getElementById('error');
     const debugInfo = document.getElementById('debug-info');
-    
-    btn.disabled = true;
-    btn.classList.add('hidden');
-    loading.classList.remove('hidden');
-    error.classList.add('hidden');
-    debugInfo.classList.add('hidden');
-    
+    const statusText = document.getElementById('status-text');
+
+    if (data.status === 'scanning') {
+        btn.classList.add('hidden');
+        rescanBtn.classList.remove('hidden'); // Kilitlenmeyi önlemek için Yeniden Tara butonu tarama esnasında da açık kalsın!
+        loading.classList.remove('hidden');
+        success.classList.add('hidden');
+        error.classList.add('hidden');
+        debugInfo.classList.add('hidden');
+        statusText.textContent = 'Arka planda taranıyor... Lütfen bekleyin.';
+        startPolling(tabId);
+    } 
+    else if (data.status === 'completed') {
+        stopPolling();
+        loading.classList.add('hidden');
+        btn.classList.add('hidden');
+        rescanBtn.classList.remove('hidden');
+        
+        debugInfo.classList.remove('hidden');
+        debugInfo.innerHTML = data.debugHtml;
+        
+        success.classList.remove('hidden');
+        success.innerHTML = data.successHtml;
+        statusText.textContent = 'Son tarama sonuçları gösteriliyor.';
+    }
+    else if (data.status === 'error') {
+        stopPolling();
+        loading.classList.add('hidden');
+        btn.classList.add('hidden');
+        rescanBtn.classList.remove('hidden');
+        error.classList.remove('hidden');
+        error.innerHTML = data.errorMsg || '❌ Hata oluştu.';
+        statusText.textContent = 'Tarama başarısız oldu.';
+    }
+}
+
+function startPolling(tabId) {
+    if (pollInterval) clearInterval(pollInterval);
+    pollInterval = setInterval(async () => {
+        const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        // Eğer kullanıcı sekme değiştirdiyse polling durmasın, ama doğru URL kontrol edilsin
+        if (!tab || tab.id !== tabId) return; 
+        
+        const pageUrl = tab.url.split('?')[0].split('#')[0];
+        const cacheKey = 'decepta_cache_' + pageUrl;
+        const cached = await chrome.storage.local.get(cacheKey);
+        
+        if (cached[cacheKey] && cached[cacheKey].status !== 'scanning') {
+            handleCacheState(cached[cacheKey], tabId);
+        }
+    }, 1000);
+}
+
+function stopPolling() {
+    if (pollInterval) {
+        clearInterval(pollInterval);
+        pollInterval = null;
+    }
+}
+
+// ========== TARAMA FONKSİYONU (Background'ı tetikler) ==========
+async function startScan() {
     try {
         const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        let targetUrl = tab.url;
+        const pageUrl = tab.url.split('?')[0].split('#')[0];
+        const cacheKey = 'decepta_cache_' + pageUrl;
         
-        // Ürün sayfasındaysak (/yorumlar değilse), yorumlar sayfasına geç
-        if (targetUrl.includes('trendyol.com') && !targetUrl.includes('/yorumlar')) {
-            // URL'den query string ve hash'i temizle, /yorumlar ekle
-            const cleanUrl = targetUrl.split('?')[0].split('#')[0];
-            targetUrl = cleanUrl + '/yorumlar';
-            
-            // Sayfayı yorumlar sayfasına yönlendir
-            await chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                func: (url) => { window.location.href = url; },
-                args: [targetUrl]
-            });
-            
-            // Sayfa yüklenene kadar bekle
-            await new Promise(resolve => {
-                const checkLoaded = setInterval(async () => {
-                    try {
-                        const result = await chrome.scripting.executeScript({
-                            target: { tabId: tab.id },
-                            func: () => document.readyState
-                        });
-                        if (result[0].result === 'complete') {
-                            clearInterval(checkLoaded);
-                            // Biraz daha bekle - React render tamamlansın
-                            setTimeout(resolve, 3000);
-                        }
-                    } catch(e) {
-                        // Sayfa hâlâ yükleniyor, devam et
-                    }
-                }, 500);
-                
-                // Maximum 15 saniye bekle
-                setTimeout(() => { clearInterval(checkLoaded); resolve(); }, 15000);
-            });
-        } else {
-            // Zaten yorumlar sayfasındayız veya başka site, kısa bekle
-            await new Promise(r => setTimeout(r, 1000));
-        }
+        // Önceki kilitlenmeleri önlemek için cache'i tamamen temizle ve scanning set et
+        await chrome.storage.local.remove(cacheKey);
         
-        // Verileri çek
-        const results = await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            files: ['content.js']
+        // UI'ı loading state'ine geçir
+        handleCacheState({ status: 'scanning' }, tab.id);
+        
+        // Cache'i scanning olarak işaretle (popup kapanırsa diye)
+        await chrome.storage.local.set({ [cacheKey]: {
+            status: 'scanning',
+            timestamp: Date.now()
+        }});
+        
+        // Background script'e mesaj gönder
+        chrome.runtime.sendMessage({ 
+            action: 'startScan', 
+            tabId: tab.id, 
+            url: tab.url 
         });
         
-        const pageData = results[0].result;
-        
-        // DEBUG göster
-        debugInfo.classList.remove('hidden');
-        if (pageData && pageData.extracted_data) {
-            const ed = pageData.extracted_data;
-            const photoCount = ed.photo_reviews_count || 0;
-            let debugHtml = `
-                <b>🔍 Eklenti Çıktısı (v7):</b><br>
-                📊 Puan: <b>${ed.score}</b> (${ed.debug_source || '?'})<br>
-                📝 Değerlendirme: <b>${ed.total_ratings}</b><br>
-                💬 Yorum: <b>${ed.total_reviews}</b><br>
-                📸 Fotoğraflı yorum: <b>${photoCount}</b>
-            `;
-            if (ed.total_reviews === 0 && ed.comments.length === 0) {
-                debugHtml += `<br><br>⚠️ <b>Yorum bulunamadı.</b>`;
-            }
-            debugInfo.innerHTML = debugHtml;
-        } else {
-            debugInfo.innerHTML = `<b>HATA:</b> Veri çekilemedi!<br>${JSON.stringify(pageData).substring(0, 300)}`;
-            loading.classList.add('hidden');
-            btn.classList.remove('hidden');
-            btn.disabled = false;
-            return;
-        }
-        
-        // Backend'e gönder
-        // Navigasyon sonrası güncel URL'yi al
-        const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-        const postBody = {
-            url: currentTab.url,
-            extracted_data: pageData.extracted_data
-        };
-        
-        console.log('[Decepta AI] Backend\'e gönderilen:', JSON.stringify(postBody, null, 2));
-        
-        const response = await fetch('http://127.0.0.1:8000/api/v1/scan', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(postBody)
-        });
-        
-        if (!response.ok) throw new Error("Backend hatası: " + response.status);
-        
-        const data = await response.json();
-        
-        loading.classList.add('hidden');
-        success.classList.remove('hidden');
-        success.innerHTML = `✅ Başarılı!<br><a href="http://localhost:5173/?taskId=${data.task_id}" target="_blank" style="color:#3b82f6;">Sonuçları Görmek İçin Tıkla</a>`;
-        
-    } catch (err) {
-        loading.classList.add('hidden');
-        error.textContent = "❌ " + err.message;
-        error.classList.remove('hidden');
-        btn.classList.remove('hidden');
-        btn.disabled = false;
+    } catch(err) {
+        console.error(err);
     }
-});
+}
+
+// ========== EVENT LISTENERS ==========
+document.getElementById('scan-btn').addEventListener('click', startScan);
+document.getElementById('rescan-btn').addEventListener('click', startScan);

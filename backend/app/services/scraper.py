@@ -34,10 +34,38 @@ class PlaywrightScraper:
                 
                 await page.goto(self.url, wait_until="domcontentloaded", timeout=45000)
                 
+                # n11 Redirection support
+                if "n11.com" in self.url.lower() and "product-reviews" not in self.url.lower():
+                    # Scroll to load review tab
+                    await page.evaluate("""
+                        const reviewTab = document.querySelector('#tabReviews, .tabPanelReviews, a[href="#reviews"], [data-testid="reviews-tab"]');
+                        if (reviewTab) {
+                            reviewTab.scrollIntoView({ behavior: 'instant', block: 'center' });
+                            reviewTab.click();
+                        }
+                    """)
+                    await page.wait_for_timeout(1500)
+                    
+                    # Extract "Tüm Yorumları Gör" link
+                    reviews_href = await page.evaluate("""() => {
+                        const linkEl = document.querySelector('a.product-reviews__link, a[href*="product-reviews"]');
+                        if (linkEl && linkEl.getAttribute('href')) return linkEl.getAttribute('href');
+                        const links = Array.from(document.querySelectorAll('a'));
+                        const seeAllLink = links.find(el => el.textContent.includes('Tüm Yorumları Gör'));
+                        return seeAllLink ? seeAllLink.getAttribute('href') : null;
+                    }""")
+                    
+                    if reviews_href:
+                        reviews_url = "https://www.n11.com" + reviews_href
+                        logger.info(f"n11 reviews page detected! Redirecting to: {reviews_url}")
+                        self.url = reviews_url
+                        await page.goto(self.url, wait_until="domcontentloaded", timeout=45000)
+
                 # Scroll
-                for i in range(1, 6):
-                    await page.evaluate(f"window.scrollTo(0, document.body.scrollHeight * {i/5})")
-                    await page.wait_for_timeout(800)
+                scroll_steps = 10 if "product-reviews" in self.url.lower() else 5
+                for i in range(1, scroll_steps + 1):
+                    await page.evaluate("window.scrollBy(0, 800)")
+                    await page.wait_for_timeout(500)
                 
                 await page.wait_for_timeout(2000)
 
@@ -116,6 +144,12 @@ class PlaywrightScraper:
             return round(score, 1)
             
         if self.soup:
+            # n11 big statistics score
+            n11_score = self.soup.select_one('span.product-review-statistics-score__big')
+            if n11_score:
+                try: return float(n11_score.text.strip().replace(',', '.'))
+                except: pass
+
             trendyol_score = self.soup.find(class_='pr-in-rnr-v')
             if trendyol_score:
                 try: return float(trendyol_score.text.strip().replace(',', '.'))
@@ -143,6 +177,18 @@ class PlaywrightScraper:
         
         total_ratings = rat_c if rat_c else 0
         total_reviews = rev_c if rev_c else 0
+
+        # n11 statistics parsing
+        if "n11.com" in self.url.lower():
+            if self.soup:
+                ratings_el = self.soup.select_one('p.product-review-statistics__review-desc')
+                if ratings_el:
+                    try: total_ratings = int(re.sub(r'\D', '', ratings_el.text))
+                    except: pass
+                comment_el = self.soup.select_one('span.product-review-statistics__review-desc')
+                if comment_el:
+                    try: total_reviews = int(re.sub(r'\D', '', comment_el.text))
+                    except: pass
         
         if total_ratings == 0:
             if self.soup:
@@ -195,6 +241,57 @@ class PlaywrightScraper:
         if not self.soup: return []
             
         comments = []
+        
+        # Standalone n11/Hepsiburada/Trendyol high-precision selectors
+        if "n11.com" in self.url.lower():
+            # Standalone reviews page
+            cards = self.soup.select('.review-cart-wrapper__list > .review-card, .review-cart-wrapper__list > .card-wrapper, .card-wrapper.review-card.rounded')
+            for card in cards:
+                text_el = card.select_one('.card-detail__contents')
+                if text_el and len(text_el.text.strip()) > 2:
+                    comments.append(text_el.text.strip())
+            # Product details page fallback
+            if not comments:
+                for el in self.soup.select('.commentText, .commentDetail p'):
+                    if len(el.text.strip()) > 2:
+                        comments.append(el.text.strip())
+        elif "hepsiburada.com" in self.url.lower():
+            all_cards = self.soup.find_all(class_=lambda c: c and any("ReviewCard" in x for x in c.split()))
+            top_cards = [c for c in all_cards if not any("ReviewCard" in cls for cls in (c.parent.get('class', []) if c.parent else []))]
+            for card in top_cards:
+                # Filter out non-review widgets (seller info etc.)
+                meta_user = card.find('meta', content=True)
+                has_date = any(('-' in span.get('content', '') and len(span.get('content', '')) == 10) for span in card.find_all('span', content=True))
+                if not meta_user and not has_date:
+                    continue
+                    
+                text_selectors = [
+                    '[itemprop="description"]',
+                    '[class*="review-comment"]',
+                    '[class*="ReviewCard-module"] p',
+                    'span[style*="text-align:start"]:not([class])',
+                    'p'
+                ]
+                for sel in text_selectors:
+                    el = card.select_one(sel)
+                    if el and len(el.text.strip()) > 2:
+                        comments.append(el.text.strip())
+                        break
+        elif "trendyol.com" in self.url.lower():
+            text_selectors = [
+                '.rnr-com-tx',
+                '.comment-text',
+                '.review-comment',
+                '.review-text',
+                '.pr-rvw-crd-tx'
+            ]
+            for sel in text_selectors:
+                for el in self.soup.select(sel):
+                    if len(el.text.strip()) > 2:
+                        comments.append(el.text.strip())
+                        
+        if comments:
+            return list(set(comments))
         for script in self.soup(["script", "style", "noscript", "meta", "svg", "path", "nav", "footer"]):
             script.extract()
             

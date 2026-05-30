@@ -82,9 +82,12 @@ async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer, htm
             photo_reviews_count = sum(1 for r in detailed_reviews if r.get("images"))
         
         if detailed_reviews:
-            image_analyzer = ImageAnalyzer()
-            img_suspicious = image_analyzer.analyze_images(detailed_reviews)
-            suspicious_list.extend(img_suspicious)
+            try:
+                image_analyzer = ImageAnalyzer()
+                img_suspicious = image_analyzer.analyze_images(detailed_reviews)
+                suspicious_list.extend(img_suspicious)
+            except Exception as img_err:
+                logger.warning(f"Görüntü analizi başarısız (devam ediliyor): {img_err}")
             
         TASKS_DB[task_id]["current_step"] = f"2/3: NLP Analizi Yapılıyor ({len(real_comments)} organik değerlendirme)..."
         TASKS_DB[task_id]["progress"] = 65
