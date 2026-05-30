@@ -493,7 +493,7 @@ async function scanHepsiburadaAllPages(tabId, baseUrl, logScan = console.log) {
         let commentsList = [];
         let detailedReviewsList = [];
         allReviewsMap.forEach((val) => {
-            if (val.text && val.text.length > 2) {
+            if (val.text && val.text.length > 0) {
                 commentsList.push(val.text);
             }
             detailedReviewsList.push({ text: val.text || "", images: val.images || [] });
@@ -614,12 +614,12 @@ async function getReviewSignaturesOnPage(tabId) {
                     let extractedText = '';
                     for (const sel of textSelectors) {
                         const el = card.querySelector(sel);
-                        if (el && el.innerText.trim().length > 2) {
+                        if (el && el.innerText.trim().length > 0) {
                             extractedText = el.innerText.trim();
                             break;
                         }
                     }
-                    const hasReviewText = extractedText.length > 2;
+                    const hasReviewText = extractedText.length > 0;
                     
                     // Kullanıcı görsellerini topla
                     let imgs = [];

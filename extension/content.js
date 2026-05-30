@@ -73,7 +73,7 @@
                                     r.images.forEach(img => { if (img.url) imgs.push(img.url); else if (typeof img === 'string') imgs.push(img); });
                                 }
                                 
-                                if (typeof txt === 'string' && txt.length > 2) {
+                                if (typeof txt === 'string' && txt.length > 0) {
                                     const cleanTxt = txt.trim();
                                     if (!comments.includes(cleanTxt)) {
                                         comments.push(cleanTxt);
@@ -104,7 +104,7 @@
                         }
                     });
                     
-                    if (txt.length > 2) {
+                    if (txt.length > 0) {
                         if (!comments.includes(txt)) {
                             comments.push(txt);
                             detailedReviews.push({ text: txt, images: imgs });
@@ -166,7 +166,7 @@
                         let txt = "";
                         for (const tsel of textSelectors) {
                             const textEl = el.querySelector(tsel);
-                            if (textEl && textEl.innerText.trim().length > 2) {
+                            if (textEl && textEl.innerText.trim().length > 0) {
                                 txt = textEl.innerText.trim();
                                 break;
                             }
@@ -209,7 +209,7 @@
                             }
                         });
 
-                        if (txt.length > 2) {
+                        if (txt.length > 0) {
                             if (!comments.includes(txt)) {
                                 comments.push(txt);
                                 detailedReviews.push({ text: txt, images: imgs });
@@ -415,7 +415,7 @@
                 let hasText = false;
                 for (const sel of textSelectors) {
                     const textEl = card.querySelector(sel);
-                    if (textEl && textEl.innerText.trim().length > 2) {
+                    if (textEl && textEl.innerText.trim().length > 0) {
                         hasText = true;
                         break;
                     }
