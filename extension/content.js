@@ -476,18 +476,6 @@
         //   - Hepsiburada: -yorumlari sayfasına yönlendirilmiş (popup.js pagination ile tüm sayfaları ayrıca tarar)
         let photoReviewsCount = 0;
         
-        // Görsel filtresi (ikon, avatar, star dışla)
-        const isReviewPhoto = (img) => {
-            const src = img.src || img.dataset?.src || '';
-            if (!src || src.startsWith('data:')) return false;
-            const excludePatterns = ['avatar', 'star', 'icon', 'svg', 'badge', 'logo', 'emoji', 'placeholder'];
-            if (excludePatterns.some(p => src.toLowerCase().includes(p))) return false;
-            const w = img.naturalWidth || img.width || 0;
-            const h = img.naturalHeight || img.height || 0;
-            if ((w > 0 && w < 40) || (h > 0 && h < 40)) return false;
-            return true;
-        };
-
         // Yöntem A: detailedReviews içinden (Trendyol: scroll sonrası tam yüklü kartlar)
         photoReviewsCount = detailedReviews.filter(r => r.images && r.images.length > 0).length;
         
