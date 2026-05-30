@@ -17,6 +17,33 @@
         let detailedReviews = [];
         let debug_source = '';
 
+        const isReviewPhoto = (img) => {
+            const src = img.src || img.dataset?.src || '';
+            if (!src || src.startsWith('data:')) return false;
+            
+            const lowerSrc = src.toLowerCase();
+            
+            // Hepsiburada ve Trendyol için whitelist (UI ikonlarını, yıldızları vb. kesinlikle dışlar)
+            if (isHepsiburada) {
+                return lowerSrc.includes('usercontents') || lowerSrc.includes('review-images');
+            }
+            if (isTrendyol) {
+                return lowerSrc.includes('ty-images.com') || lowerSrc.includes('review-images') || lowerSrc.includes('usercontents');
+            }
+            if (isN11) {
+                return lowerSrc.includes('n11scdn') || lowerSrc.includes('akamaized.net') || lowerSrc.includes('n11images.com') || lowerSrc.includes('review-images') || lowerSrc.includes('usercontents');
+            }
+            
+            // Küçük ikonları (star, badge, avatar) dışla (diğer siteler için fallback)
+            const excludePatterns = ['avatar', 'star', 'icon', 'svg', 'badge', 'logo', 'emoji', 'placeholder', 'thumbs'];
+            if (excludePatterns.some(p => lowerSrc.includes(p))) return false;
+            // Çok küçük görselleri dışla (genelde ikon/star olur)
+            const w = img.naturalWidth || img.width || 0;
+            const h = img.naturalHeight || img.height || 0;
+            if ((w > 0 && w < 40) || (h > 0 && h < 40)) return false;
+            return true;
+        };
+
         // ========== 1. __NEXT_DATA__ (Eski Trendyol / bazı siteler) ==========
         const nextDataEl = document.getElementById('__NEXT_DATA__');
         if (nextDataEl) {
@@ -174,32 +201,6 @@
                         
                         // Görselleri bul — kullanıcının yüklediği ürün fotoğrafları
                         const imgs = [];
-                        const isReviewPhoto = (img) => {
-                            const src = img.src || img.dataset?.src || '';
-                            if (!src || src.startsWith('data:')) return false;
-                            
-                            const lowerSrc = src.toLowerCase();
-                            
-                            // Hepsiburada ve Trendyol için whitelist (UI ikonlarını, yıldızları vb. kesinlikle dışlar)
-                            if (isHepsiburada) {
-                                return lowerSrc.includes('usercontents') || lowerSrc.includes('review-images');
-                            }
-                            if (isTrendyol) {
-                                return lowerSrc.includes('ty-images.com') || lowerSrc.includes('review-images') || lowerSrc.includes('usercontents');
-                            }
-                            if (isN11) {
-                                return lowerSrc.includes('n11scdn') || lowerSrc.includes('akamaized.net') || lowerSrc.includes('n11images.com') || lowerSrc.includes('review-images') || lowerSrc.includes('usercontents');
-                            }
-                            
-                            // Küçük ikonları (star, badge, avatar) dışla (diğer siteler için fallback)
-                            const excludePatterns = ['avatar', 'star', 'icon', 'svg', 'badge', 'logo', 'emoji', 'placeholder', 'thumbs'];
-                            if (excludePatterns.some(p => lowerSrc.includes(p))) return false;
-                            // Çok küçük görselleri dışla (genelde ikon/star olur)
-                            const w = img.naturalWidth || img.width || 0;
-                            const h = img.naturalHeight || img.height || 0;
-                            if ((w > 0 && w < 40) || (h > 0 && h < 40)) return false;
-                            return true;
-                        };
                         el.querySelectorAll('img').forEach(img => {
                             if (isReviewPhoto(img)) {
                                 const src = img.src || img.dataset?.src;
