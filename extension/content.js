@@ -23,21 +23,20 @@
             
             const lowerSrc = src.toLowerCase();
             
-            // Hepsiburada ve Trendyol için whitelist (UI ikonlarını, yıldızları vb. kesinlikle dışlar)
+            // Platform bazlı güvenli kaynak (whitelist) ön filtreleme kontrolü
             if (isHepsiburada) {
-                return lowerSrc.includes('usercontents') || lowerSrc.includes('review-images');
-            }
-            if (isTrendyol) {
-                return lowerSrc.includes('ty-images.com') || lowerSrc.includes('review-images') || lowerSrc.includes('usercontents');
-            }
-            if (isN11) {
-                return lowerSrc.includes('n11scdn') || lowerSrc.includes('akamaized.net') || lowerSrc.includes('n11images.com') || lowerSrc.includes('review-images') || lowerSrc.includes('usercontents');
+                if (!(lowerSrc.includes('usercontents') || lowerSrc.includes('review-images'))) return false;
+            } else if (isTrendyol) {
+                if (!(lowerSrc.includes('dsmcdn.com') || lowerSrc.includes('ty-images.com') || lowerSrc.includes('review-images') || lowerSrc.includes('usercontents'))) return false;
+            } else if (isN11) {
+                if (!(lowerSrc.includes('n11scdn') || lowerSrc.includes('akamaized.net') || lowerSrc.includes('n11images.com') || lowerSrc.includes('review-images') || lowerSrc.includes('usercontents'))) return false;
             }
             
-            // Küçük ikonları (star, badge, avatar) dışla (diğer siteler için fallback)
+            // Küçük ikonları, yıldızları, avatarları ve kullanıcı arayüzü elemanlarını kesinlikle dışla
             const excludePatterns = ['avatar', 'star', 'icon', 'svg', 'badge', 'logo', 'emoji', 'placeholder', 'thumbs'];
             if (excludePatterns.some(p => lowerSrc.includes(p))) return false;
-            // Çok küçük görselleri dışla (genelde ikon/star olur)
+            
+            // Çok küçük görselleri dışla (genelde yıldız veya arayüz ikonu olurlar)
             const w = img.naturalWidth || img.width || 0;
             const h = img.naturalHeight || img.height || 0;
             if ((w > 0 && w < 40) || (h > 0 && h < 40)) return false;
@@ -102,10 +101,8 @@
                                 
                                 if (typeof txt === 'string' && txt.length > 0) {
                                     const cleanTxt = txt.trim();
-                                    if (!comments.includes(cleanTxt)) {
-                                        comments.push(cleanTxt);
-                                        detailedReviews.push({ text: cleanTxt, images: imgs });
-                                    }
+                                    comments.push(cleanTxt);
+                                    detailedReviews.push({ text: cleanTxt, images: imgs });
                                 }
                             });
                         }
@@ -132,10 +129,8 @@
                     });
                     
                     if (txt.length > 0) {
-                        if (!comments.includes(txt)) {
-                            comments.push(txt);
-                            detailedReviews.push({ text: txt, images: imgs });
-                        }
+                        comments.push(txt);
+                        detailedReviews.push({ text: txt, images: imgs });
                     } else if (imgs.length > 0) {
                         detailedReviews.push({ text: "", images: imgs });
                     }
@@ -157,7 +152,9 @@
                 '[class*="review-card"]',
                 '[class*="reviewCard"]',
                 '.review',
-                // Hepsiburada Hermes
+                '#hermes-voltran-comments [class*="ReviewCard"]',
+                '.paginationContentHolder [class*="ReviewCard"]',
+                '[class*="ReviewList"] [class*="ReviewCard"]',
                 '[class*="hermes-ReviewCard-module"]',
                 '[class*="ReviewCard"]',
                 // n11 Yorum Seçicileri
@@ -181,6 +178,8 @@
                             '.pr-rvw-crd-tx',
                             '[itemprop="description"]',
                             '[class*="review-comment"]',
+                            'span[style*="text-align"]',
+                            'span:not([class])',
                             '[class*="ReviewCard-module"] p',
                             '[class*="ReviewCard"] span[style*="text-align:start"]:not([class])',
                             'span[style*="text-align:start"]:not([class])',
@@ -211,10 +210,8 @@
                         });
 
                         if (txt.length > 0) {
-                            if (!comments.includes(txt)) {
-                                comments.push(txt);
-                                detailedReviews.push({ text: txt, images: imgs });
-                            }
+                            comments.push(txt);
+                            detailedReviews.push({ text: txt, images: imgs });
                         } else if (imgs.length > 0) {
                             // Metin yok ama gerçek görsel var -> comments listesine "[Sadece Görsel]" eklemiyoruz 
                             // (arka plandaki duplicate/kopya bot analizini bozmasın), detailedReviews'e boş metinle ekliyoruz
