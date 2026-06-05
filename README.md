@@ -109,13 +109,13 @@ npm run dev
 | Hafta | Kapsam | Durum |
 |:---:|:---|:---:|
 | 1 | Proje kurulumu, veri araştırması, NLP metodoloji | ✅ |
-| 2 | Veritabanı şemaları, UI wireframe | ⬜ |
-| 3 | Veri ön işleme pipeline | ⬜ |
-| 4 | HuggingFace duygu analizi | ⬜ |
+| 2 | Veritabanı şemaları, UI wireframe | ✅ |
+| 3 | Veri ön işleme pipeline | ✅ |
+| 4 | HuggingFace duygu analizi | ✅ |
 | 5 | Neo4j entegrasyonu, graph algoritmaları | ⬜ |
-| 6 | Web scraping servisi | ⬜ |
-| 7 | FastAPI backend kurulumu | ⬜ |
-| 9 | Next.js web dashboard | ⬜ |
+| 6 | Web scraping servisi | ✅ |
+| 7 | FastAPI backend kurulumu | ✅ |
+| 9 | Next.js / React web dashboard | ✅ |
 | 10 | E2E testler ve simülasyonlar | ⬜ |
 | 11 | Cloud deployment, MVP lansman | ⬜ |
 

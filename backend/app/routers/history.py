@@ -40,3 +40,29 @@ def get_scan_detail(scan_id: str, db: Session = Depends(get_db)):
     if not scan:
         raise HTTPException(status_code=404, detail="Analiz kaydı bulunamadı.")
     return scan
+
+@router.delete("/")
+def delete_all_history(db: Session = Depends(get_db)):
+    """Tüm geçmiş taramaları (ve bağlı şüpheli yorumları) siler."""
+    try:
+        db.query(scan_db.Scan).delete()
+        db.commit()
+        return {"message": "Tüm geçmiş taramalar başarıyla silindi."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.delete("/{scan_id}")
+def delete_scan(scan_id: str, db: Session = Depends(get_db)):
+    """Belirli bir taramayı siler."""
+    scan = db.query(scan_db.Scan).filter(scan_db.Scan.id == scan_id).first()
+    if not scan:
+        raise HTTPException(status_code=404, detail="Analiz kaydı bulunamadı.")
+    
+    try:
+        db.delete(scan)
+        db.commit()
+        return {"message": "Tarama başarıyla silindi."}
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))

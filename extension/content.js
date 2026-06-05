@@ -25,7 +25,7 @@
             
             // Platform bazlı güvenli kaynak (whitelist) ön filtreleme kontrolü
             if (isHepsiburada) {
-                if (!(lowerSrc.includes('usercontents') || lowerSrc.includes('review-images'))) return false;
+                if (!(lowerSrc.includes('usercontents/s/0/') || lowerSrc.includes('usercontents\\/s\\/0\\/') || lowerSrc.includes('review-images'))) return false;
             } else if (isTrendyol) {
                 if (!(lowerSrc.includes('dsmcdn.com') || lowerSrc.includes('ty-images.com') || lowerSrc.includes('review-images') || lowerSrc.includes('usercontents'))) return false;
             } else if (isN11) {
@@ -166,8 +166,23 @@
             ];
             
             for (const sel of containerSelectors) {
-                const cards = document.querySelectorAll(sel);
+                let cards = document.querySelectorAll(sel);
                 if (cards.length > 0) {
+                    // İç içe kart veya alt-eleman çakışmasını engelle (parent-child de-duplication)
+                    cards = Array.from(cards).filter(card => {
+                        let parent = card.parentElement;
+                        while (parent) {
+                            if (parent.className && typeof parent.className === 'string') {
+                                const clsLower = parent.className.toLowerCase();
+                                if (clsLower.includes('reviewcard') || clsLower.includes('review-card')) {
+                                    return false;
+                                }
+                            }
+                            parent = parent.parentElement;
+                        }
+                        return true;
+                    });
+                    
                     cards.forEach(el => {
                         // Yorum metnini bul
                         const textSelectors = [
@@ -569,8 +584,11 @@
         if (photoReviewsCount === 0 && isHepsiburada) {
             try {
                 const html = document.documentElement.innerHTML;
-                const matches = html.match(/usercontents\/s\/0\/\{size\}\/([a-f0-9-]+)\.jpg/g) || [];
-                const uniqueIds = new Set(matches.map(m => m.split('/').pop()));
+                const matches = html.match(/usercontents\\?\/s\\?\/0\\?\/[^\s"\'<>]*([a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})/g) || [];
+                const uniqueIds = new Set(matches.map(m => {
+                    const uuidMatch = m.match(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/);
+                    return uuidMatch ? uuidMatch[0] : m;
+                }));
                 if (uniqueIds.size > 0) photoReviewsCount = uniqueIds.size;
             } catch(e) {}
         }

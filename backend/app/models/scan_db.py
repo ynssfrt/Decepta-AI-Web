@@ -17,7 +17,7 @@ class Scan(Base):
     photo_reviews_count = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow)
     
-    suspicious_reviews = relationship("SuspiciousReview", back_populates="scan")
+    suspicious_reviews = relationship("SuspiciousReview", back_populates="scan", cascade="all, delete-orphan")
 
 class SuspiciousReview(Base):
     __tablename__ = "suspicious_reviews"

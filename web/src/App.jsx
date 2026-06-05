@@ -92,6 +92,30 @@ function App() {
         else setExpandedHistoryId(id);
     };
 
+    const deleteHistoryItem = async (id) => {
+        if (!window.confirm("Bu taramayı silmek istediğinize emin misiniz?")) return;
+        try {
+            const res = await fetch(`${API_HISTORY_URL}/${id}`, { method: 'DELETE' });
+            if (res.ok) {
+                setHistoryData(prev => prev.filter(item => item.id !== id));
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const deleteAllHistory = async () => {
+        if (!window.confirm("Tüm geçmişi silmek istediğinize emin misiniz? Bu işlem geri alınamaz.")) return;
+        try {
+            const res = await fetch(API_HISTORY_URL, { method: 'DELETE' });
+            if (res.ok) {
+                setHistoryData([]);
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
     return (
         <div className="dashboard-container">
             <header>
@@ -258,16 +282,34 @@ function App() {
                         ) : historyData.length === 0 ? (
                             <div className="glass-card" style={{ textAlign: 'center' }}>Henüz kaydedilmiş bir tarama yok.</div>
                         ) : (
-                            <div className="history-grid">
+                            <>
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+                                    <button 
+                                        onClick={deleteAllHistory}
+                                        style={{ background: 'rgba(239, 68, 68, 0.2)', color: '#fca5a5', border: '1px solid rgba(239, 68, 68, 0.5)', padding: '0.5rem 1rem', borderRadius: '8px', cursor: 'pointer' }}
+                                    >
+                                        🗑️ Tüm Geçmişi Temizle
+                                    </button>
+                                </div>
+                                <div className="history-grid">
                                 {historyData.map(item => (
                                     <div key={item.id} className="glass-card history-card">
                                         <div className="history-header">
                                             <div className="history-date">
                                                 {new Date(item.created_at).toLocaleString('tr-TR')}
                                             </div>
-                                            <a href={item.url} target="_blank" rel="noreferrer" className="history-url">
-                                                Ürüne Git ↗
-                                            </a>
+                                            <div style={{ display: 'flex', gap: '0.5rem' }}>
+                                                <a href={item.url} target="_blank" rel="noreferrer" className="history-url">
+                                                    Ürüne Git ↗
+                                                </a>
+                                                <button 
+                                                    onClick={() => deleteHistoryItem(item.id)}
+                                                    style={{ background: 'transparent', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: '1.2rem', padding: '0 0.5rem' }}
+                                                    title="Sil"
+                                                >
+                                                    🗑️
+                                                </button>
+                                            </div>
                                         </div>
                                         
                                         <div className="history-scores">
@@ -311,6 +353,7 @@ function App() {
                                     </div>
                                 ))}
                             </div>
+                            </>
                         )}
                     </div>
                 )}
