@@ -61,6 +61,15 @@ async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer, htm
         
         true_review_count = total_reviews if total_reviews > 0 else len(real_comments)
         
+        # Yorum sayısı limiti (Sunucuyu ve NLP modelini yormamak için max 250)
+        MAX_REVIEWS_LIMIT = 250
+        if detailed_reviews and len(detailed_reviews) > MAX_REVIEWS_LIMIT:
+            logger.info(f"Yorum sayısı limiti aşıldı! {len(detailed_reviews)} -> {MAX_REVIEWS_LIMIT} olarak sınırlandı.")
+            detailed_reviews = detailed_reviews[:MAX_REVIEWS_LIMIT]
+            
+        if real_comments and len(real_comments) > MAX_REVIEWS_LIMIT:
+            real_comments = real_comments[:MAX_REVIEWS_LIMIT]
+        
         # Yorumları ReviewDetector formatına dönüştür ve zenginleştir
         review_dicts = []
         if detailed_reviews:
@@ -140,7 +149,8 @@ async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer, htm
             # bot_percentage'ı birleştirme sonrası GERÇEK şüpheli sayısından hesapla
             # (Detektörün orijinal değeri sadece NLP sonuçlarını kapsar;
             #  ImageAnalyzer'dan gelen ekstra bulgular dahil değildir)
-            bot_percentage = int((len(suspicious_list) / max(1, true_review_count)) * 100) if true_review_count > 0 else detection_result["bot_percentage"]
+            analyzed_count = max(1, len(review_dicts))
+            bot_percentage = int((len(suspicious_list) / analyzed_count) * 100) if len(review_dicts) > 0 else detection_result["bot_percentage"]
             true_trust_score = detection_result["calculated_trust_score"]
 
         TASKS_DB[task_id]["current_step"] = "3/3: Ağ Analizi Tamamlanıyor..."
@@ -156,6 +166,7 @@ async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer, htm
             "bot_percentage": bot_percentage,
             "total_ratings": total_ratings,
             "total_reviews": true_review_count,
+            "analyzed_reviews_count": len(review_dicts),
             "photo_reviews_count": photo_reviews_count,
             "suspicious_reviews": suspicious_list
         }

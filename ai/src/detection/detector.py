@@ -1,8 +1,12 @@
 import re
 import logging
+import numpy as np
 from datetime import datetime, date
 from collections import Counter
 from typing import List, Dict, Any, Optional
+
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 from ai.src.preprocessing.text_cleaner import clean_text, calculate_text_complexity
 
@@ -69,6 +73,11 @@ class ReviewDetector:
             "çok iyi", "başarılı", "fiyat performans", "kargo hızlı", "teşekkürler", 
             "kesinlikle alın", "hızlı kargo", "memnun kaldım"
         ]
+        self.llm_phrases = [
+            "sonuç olarak", "şunu belirtmek isterim ki", "özetle", "öncelikle", 
+            "açıkçası", "mükemmel bir fiyat", "kesinlikle tavsiye", 
+            "şiddetle tavsiye", "beklentilerimi fazlasıyla", "iyi bir seçenek"
+        ]
 
     def detect(self, reviews: List[Dict[str, Any]], sentiment_analyzer, actual_platform_score: float = 4.5) -> Dict[str, Any]:
         """
@@ -100,7 +109,8 @@ class ReviewDetector:
                     "duplicates": 0,
                     "time_spikes": 0,
                     "sentiment_mismatch": 0,
-                    "generic_spam": 0
+                    "generic_spam": 0,
+                    "polarization_warning": False
                 }
             }
 
@@ -113,6 +123,8 @@ class ReviewDetector:
         sentiments = []
         parsed_dates = []
         ratings = []
+        is_verified_list = []
+        polarization_warning = False
         
         for idx, r in enumerate(reviews):
             txt = r.get("text", "")
@@ -133,37 +145,43 @@ class ReviewDetector:
                 ratings.append(int(r.get("rating")) if r.get("rating") is not None else None)
             except:
                 ratings.append(None)
+                
+            # Onaylı Satın Alım (Verified Purchase)
+            is_verified = r.get("is_verified", r.get("verified", None))
+            is_verified_list.append(is_verified)
 
         # -------------------------------------------------------------
-        # 1. Jaccard Benzerlik Tespiti (Organize Botnet Duplicate)
+        # 1. Semantik Benzerlik Tespiti (TF-IDF & Cosine Similarity)
         # -------------------------------------------------------------
         import string
         duplicate_indices = set()
-        for i in range(n_reviews):
-            if not cleaned_texts[i] or complexities[i]["word_count"] < 3:
-                continue
-            # Noktalama işaretlerini kaldırarak daha kararlı bir kelime kümesi elde et
-            cleaned_nopunct_i = cleaned_texts[i].translate(str.maketrans("", "", string.punctuation))
-            words_i = set(cleaned_nopunct_i.split())
-            
-            for j in range(i + 1, n_reviews):
-                if not cleaned_texts[j] or complexities[j]["word_count"] < 3:
-                    continue
-                cleaned_nopunct_j = cleaned_texts[j].translate(str.maketrans("", "", string.punctuation))
-                words_j = set(cleaned_nopunct_j.split())
+        
+        valid_texts = []
+        valid_indices = []
+        for i, txt in enumerate(cleaned_texts):
+            if txt and complexities[i]["word_count"] >= 3:
+                valid_texts.append(txt)
+                valid_indices.append(i)
                 
-                # Jaccard Benzerlik Katsayısı
-                intersection = len(words_i.intersection(words_j))
-                union = len(words_i.union(words_j))
-                jaccard = intersection / union if union > 0 else 0
+        if len(valid_texts) > 1:
+            try:
+                vectorizer = TfidfVectorizer()
+                tfidf_matrix = vectorizer.fit_transform(valid_texts)
+                cosine_sim = cosine_similarity(tfidf_matrix)
                 
-                if jaccard >= 0.8:
-                    duplicate_indices.add(i)
-                    duplicate_indices.add(j)
-                    
+                for i in range(len(valid_indices)):
+                    for j in range(i + 1, len(valid_indices)):
+                        if cosine_sim[i, j] > 0.80:  # Semantik benzerlik eşiği
+                            idx_i = valid_indices[i]
+                            idx_j = valid_indices[j]
+                            duplicate_indices.add(idx_i)
+                            duplicate_indices.add(idx_j)
+            except Exception as e:
+                logger.debug(f"TF-IDF Hesaplama hatası: {e}")
+                
         for idx in duplicate_indices:
             self._add_suspicion(suspicious_map, idx, reviews[idx]["text"], 
-                                "Organize botnet tespiti: Başka bir değerlendirme ile birebir/aşırı benzer metin içeriyor.")
+                                "Organize botnet tespiti: Başka bir değerlendirme ile yüksek anlamsal (semantik) benzerlik içeriyor.")
 
         # -------------------------------------------------------------
         # 2. Duygu ve Puan Tutarsızlığı (Rating-Sentiment Mismatch)
@@ -256,11 +274,18 @@ class ReviewDetector:
                                                     "Yorum patlaması (Swarm): Kısa sürede gerçekleştirilen organize olumlu bot faaliyeti kümesine dahil.")
 
         # -------------------------------------------------------------
-        # 5. Klasik NLP Kuralı (Fallback/Aşırı Harf Tekrarı)
+        # 5. Klasik NLP Kuralı & Yapay Zeka (LLM) Dili Tespiti
         # -------------------------------------------------------------
         for i in range(n_reviews):
             comp = complexities[i]
             cleaned = cleaned_texts[i]
+            
+            # LLM Tespiti: Jenerik kalıpların uzun metinlerde sık kullanılması
+            if cleaned and comp["word_count"] > 10:
+                llm_match = sum(1 for phrase in self.llm_phrases if phrase in cleaned)
+                if llm_match >= 1 and sentiments[i]["label"] == "POSITIVE":
+                    self._add_suspicion(suspicious_map, i, reviews[i]["text"], 
+                                        "Yapay zeka (LLM) paterni: Doğal olmayan, jenerik AI üslubu barındıran övgü metni.")
             
             # Karakter tekrarı (anlamsız harf dizilimi)
             if comp["avg_word_length"] > 15:
@@ -275,6 +300,23 @@ class ReviewDetector:
                     if most_common[1] > 3 and sentiments[i]["label"] == "POSITIVE":
                         self._add_suspicion(suspicious_map, i, reviews[i]["text"], 
                                             f"Yapay anlatım: Aşırı kelime tekrarı ('{most_common[0]}' kelimesi {most_common[1]} kez geçti).")
+
+        # -------------------------------------------------------------
+        # 6. U-Tipi Kutuplaşma (Polarization) Analizi
+        # -------------------------------------------------------------
+        valid_ratings_only = [r for r in ratings if r is not None]
+        if len(valid_ratings_only) >= 5:
+            count_1_5 = sum(1 for r in valid_ratings_only if r in [1, 5])
+            count_2_3_4 = sum(1 for r in valid_ratings_only if r in [2, 3, 4])
+            
+            if count_1_5 / len(valid_ratings_only) > 0.75 and count_2_3_4 <= len(valid_ratings_only) * 0.25:
+                polarization_warning = True
+                for i in range(n_reviews):
+                    rating = ratings[i]
+                    if rating == 5 and i in suspicious_map:
+                        self._add_suspicion(suspicious_map, i, reviews[i]["text"], "U-Tipi Anomali: Şüpheli bot şişirmesi bölgesinde (Kutuplaşmış Ürün).")
+                    elif rating == 1 and i in suspicious_map:
+                        self._add_suspicion(suspicious_map, i, reviews[i]["text"], "U-Tipi Anomali: Şüpheli karalama bölgesinde (Kutuplaşmış Ürün).", is_fake_negative=True)
 
         # -------------------------------------------------------------
         # ÇIKIŞ OLUŞTURMA VE ÇİFT YÖNLÜ GÜVEN SKORU HESABI
@@ -302,7 +344,12 @@ class ReviewDetector:
         # - Sahte Olumlu (Spam/Bot) yorumların oyu (5.0) toplamdan elenerek puan düşürülür.
         # - Rakip Karalama (Haksız Negatif) yorumların oyu (1.0) toplamdan elenerek puan yükseltilir.
         total_ratings = n_reviews
-        suspected_bot_ratings = fake_positives_count
+        # Verified Purchase (Onaylı Satın Alım) Ceza Katsayısı
+        # Eğer sahte pozitiflerin çoğu onaylı satın alım DEĞİLSE, cezayı artır
+        unverified_bots = sum(1 for idx, item in suspicious_map.items() if not item.get("is_fake_negative", False) and is_verified_list[idx] is False)
+        
+        # Ağırlıklandırılmış bot yorum sayısı (Doğrulanmamış botlar x 1.5 ceza puanı)
+        suspected_bot_ratings = fake_positives_count + (unverified_bots * 0.5)
         suspected_attack_ratings = fake_negatives_count
         
         organic_ratings_count = max(0, total_ratings - suspected_bot_ratings - suspected_attack_ratings)
@@ -326,7 +373,8 @@ class ReviewDetector:
             "total_reviews": n_reviews,
             "fake_positives": fake_positives_count,
             "fake_negatives": fake_negatives_count,
-            "bot_percentage": bot_percentage
+            "bot_percentage": bot_percentage,
+            "polarization_warning": polarization_warning
         }
 
         return {
