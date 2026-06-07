@@ -139,26 +139,13 @@ async function startScanInBackground(tabId, targetUrl) {
             await chrome.scripting.executeScript({
                 target: { tabId },
                 func: async () => {
-                    const style = document.createElement('style');
-                    style.innerHTML = `
-                        .spinner, .loader, [class*="spinner"], [class*="loader"], .blockUI, .loading-overlay { 
-                            display: none !important; opacity: 0 !important; visibility: hidden !important; 
-                        }
-                    `;
-                    document.head.appendChild(style);
-
                     await new Promise(resolve => {
-                        let step = 0; const maxSteps = 40;
+                        let step = 0; const steps = 12;
                         const scroll = () => {
                             step++;
-                            window.scrollTo(0, document.body.scrollHeight);
-                            
-                            const reviewCards = document.querySelectorAll('.review-cart-wrapper__list > .review-card, .comment, .review-card, .card-wrapper');
-                            if (reviewCards.length >= 250 || step >= maxSteps) {
-                                setTimeout(resolve, 1500);
-                            } else {
-                                setTimeout(scroll, 600);
-                            }
+                            window.scrollBy(0, 800);
+                            if (step < steps) setTimeout(scroll, 300);
+                            else setTimeout(resolve, 1000);
                         };
                         scroll();
                     });

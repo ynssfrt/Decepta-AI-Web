@@ -1,0 +1,191 @@
+--- Card 1 Outer HTML ---
+<div class="hermes-ReviewCard-module-dY_oaYMIo0DJcUiSeaVW">
+ <div class="hermes-ReviewCard-module-smSufrjDnuVpMaizDCFn" style="background-color:#eee">
+  <div class="hermes-ReviewCard-module-Cm0IfQi6_sPH1ZzgO6PB" data-testid="buyerTooltipContainer">
+  </div>
+  <strong data-testid="title">
+   ZA
+  </strong>
+ </div>
+ <div class="hermes-ReviewCard-module-BJtQZy5Ub3goN_D0yNOP">
+  <div class="hermes-ReviewCard-module-d8jkIeahEht8S_8pEvs2">
+   <div class="hermes-ReviewCard-module-A7POv1Ekpwm2UnGNMxgt" style="background-color:#eee">
+    <div class="hermes-ReviewCard-module-Cm0IfQi6_sPH1ZzgO6PB" data-testid="buyerTooltipContainer">
+    </div>
+    <strong data-testid="title">
+     ZA
+    </strong>
+   </div>
+   <div class="hermes-ReviewCard-module-hzOdR4lDXM2ywH_GGov3">
+    <div class="hermes-ReviewCard-module-SBoho2ewx9jfjIE6ywIF">
+     <span class="hermes-ReviewCard-module-z4Q5M8JvuXI1Frb7sfqw">
+      <div class="hermes-RatingPointer-module-UefD0t2XvgGWsKdLkNoX">
+       <div class="star" style="width:12px;height:12px">
+       </div>
+       <div class="star" style="width:12px;height:12px">
+       </div>
+       <div class="star" style="width:12px;height:12px">
+       </div>
+       <div class="star" style="width:12px;height:12px">
+       </div>
+       <div class="star" style="width:12px;height:12px">
+       </div>
+      </div>
+     </span>
+     <div class="hermes-ReviewCard-module-ba888_vGEW2e_XKxTgdA">
+      <span class="hermes-ReviewCard-module-WROMVGVqxBDYV9UkBWTS" content="2026-03-13">
+       13 Mart, Cum
+      </span>
+      <span class="hermes-ReviewCard-module-a3iKJ74xzDHVOQ9uZvqO">
+       |
+      </span>
+      <div class="hermes-ReviewCard-module-p2lw9pDiloK0sQ9iHHQy">
+       <div>
+        <meta content="Z**** A**** "/>
+       </div>
+       <span class="hermes-ReviewCard-module-ooww5HUvW5kp0ULoZFyH">
+        Z**** A****
+       </span>
+      </div>
+     </div>
+    </div>
+   </div>
+  </div>
+  <div class="hermes-ReviewCard-module-KaU17BbDowCWcTZ9zzxw">
+   <span style="text-align:start">
+    Ürün paketleme güzeldi ürün zarar görmemişti, parçaları tam geldi, ürün hızlı elime ulaştı. Oğlum kullanıyor çok memnun kaldı. Satıcı firmanın ilgisinden çok memnun kaldık, ürün tesliminden sonra telefonla ulaşıp bilgi aldılar kendilerine teşekkür ederiz 😊
+   </span>
+   <div class="hermes-ReviewCard-module-KmAp6RGZFgoRuElVHoHy">
+    <span class="hermes-ReviewCard-module-BQlYh69wdyWiTT44folQ">
+     Kullanıcı bu ürünü
+    </span>
+    <span class="hermes-ReviewCard-module-_yfz1l8ZrCQDTEOSHbzQ" role="button" style="cursor:pointer" tabindex="0">
+     Yonka Müzik Market A.Ş
+    </span>
+    <span class="hermes-ReviewCard-module-BQlYh69wdyWiTT44folQ">
+     satıcısından
+    </span>
+    <span class="hermes-ReviewCard-module-BQlYh69wdyWiTT44folQ">
+     aldı.
+    </span>
+    <div class="hermes-ReviewCard-module-TspG0RoSQfjBwh_1DIaf">
+     <div class="hermes-ReviewCard-module-NTaJkU5vSwVarg1jEokX">
+      <span class="hermes-ReviewCard-module-A7JX8ktsjCC4EAyJOuop">
+      </span>
+      <span class="hermes-ReviewCard-module-CZITznkYbjkDwApHySHm">
+       Renk
+      </span>
+      <span class="hermes-ReviewCard-module-xvC02W_0j3edI0itfXVA">
+       Mat Siyah
+      </span>
+     </div>
+    </div>
+   </div>
+  </div>
+  <div>
+   <span content="0">
+   </span>
+   <span content="5">
+   </span>
+   <span content="5">
+   </span>
+  </div>
+  <div class="hermes-ReviewCard-module-_K5KClPNOmqYajjPTcHy">
+  </div>
+  <div class="hermes-ReviewCard-module-PIYjivsoZ80VfkdrlGgg">
+   <div class="hermes-ReviewCard-module-Kl1HEMGgBAByCK6ilhDw">
+    <span class="hermes-ReviewCard-module-vFAQi2ejzgywq1N5EhbR">
+     Bu değerlendirme faydalı mı?
+    </span>
+    <div class="hermes-ReviewCard-module-mMWiHRkBKV4Lw0a_9jNQ">
+     <div class="hermes-ReviewCard-module-TmvsHE1pbDdDHzyLW5w3">
+      <div class="hermes-ReviewCard-module-PbSfiSWIgfswGGBaOrw7">
+       <div class="thumbsUp hermes-ReviewCard-module-lOsa4wAwncdp3GgzpaaV">
+       </div>
+      </div>
+      <div class="hermes-ReviewCard-module-X2QyqJuzO3qbXSWF8zHK">
+       0
+      </div>
+     </div>
+     <div class="hermes-ReviewCard-module-TmvsHE1pbDdDHzyLW5w3">
+      <div class="hermes-ReviewCard-module-PbSfiSWIgfswGGBaOrw7 hermes-ReviewCard-module-YHexIMZApHR8oCKoe9aY">
+       <div class="thumbsDown hermes-ReviewCard-module-hiS8vgAdxD2oeXanfvPg">
+       </div>
+      </div>
+      <div class="hermes-ReviewCard-module-X2QyqJuzO3qbXSWF8zHK">
+       0
+      </div>
+     </div>
+    </div>
+   </div>
+   <div class="hermes-ReviewCard-module-W9XCUrsYbMxwcvGtu1MF">
+    <span class="hermes-ReviewCard-module-eFtSSTU4lYZLCnzHtzca">
+     Teşekkür Ederiz.
+    </span>
+   </div>
+   <div class="hermes-ReviewCard-module-ruLxUj2RGQAlFAobNixn">
+    Bildir
+   </div>
+  </div>
+ </div>
+</div>
+
+
+--- Card 1 All text spans ---
+Span Class=['hermes-ReviewCard-module-z4Q5M8JvuXI1Frb7sfqw'], Style=None: ''
+Span Class=['hermes-ReviewCard-module-WROMVGVqxBDYV9UkBWTS'], Style=None: '13 Mart, Cum'
+Span Class=['hermes-ReviewCard-module-a3iKJ74xzDHVOQ9uZvqO'], Style=None: '|'
+Span Class=['hermes-ReviewCard-module-ooww5HUvW5kp0ULoZFyH'], Style=None: 'Z**** A****'
+Span Class=None, Style=text-align:start: 'Ürün paketleme güzeldi ürün zarar görmemişti, parçaları tam geldi, ürün hızlı elime ulaştı. Oğlum kullanıyor çok memnun kaldı. Satıcı firmanın ilgisinden çok memnun kaldık, ürün tesliminden sonra telefonla ulaşıp bilgi aldılar kendilerine teşekkür ederiz 😊'
+Span Class=['hermes-ReviewCard-module-BQlYh69wdyWiTT44folQ'], Style=None: 'Kullanıcı bu ürünü'
+Span Class=['hermes-ReviewCard-module-_yfz1l8ZrCQDTEOSHbzQ'], Style=cursor:pointer: 'Yonka Müzik Market A.Ş'
+Span Class=['hermes-ReviewCard-module-BQlYh69wdyWiTT44folQ'], Style=None: 'satıcısından'
+Span Class=['hermes-ReviewCard-module-BQlYh69wdyWiTT44folQ'], Style=None: 'aldı.'
+Span Class=['hermes-ReviewCard-module-A7JX8ktsjCC4EAyJOuop'], Style=None: ''
+Span Class=['hermes-ReviewCard-module-CZITznkYbjkDwApHySHm'], Style=None: 'Renk'
+Span Class=['hermes-ReviewCard-module-xvC02W_0j3edI0itfXVA'], Style=None: 'Mat Siyah'
+Span Class=None, Style=None: ''
+Span Class=None, Style=None: ''
+Span Class=None, Style=None: ''
+Span Class=['hermes-ReviewCard-module-vFAQi2ejzgywq1N5EhbR'], Style=None: 'Bu değerlendirme faydalı mı?'
+Span Class=['hermes-ReviewCard-module-eFtSSTU4lYZLCnzHtzca'], Style=None: 'Teşekkür Ederiz.'
+
+--- Card 1 All p tags ---
+
+--- Card 1 All div tags ---
+Div Class=['hermes-ReviewCard-module-smSufrjDnuVpMaizDCFn'], Style=background-color:#eee: 'ZA'
+Div Class=['hermes-ReviewCard-module-Cm0IfQi6_sPH1ZzgO6PB'], Style=None: ''
+Div Class=['hermes-ReviewCard-module-BJtQZy5Ub3goN_D0yNOP'], Style=None: 'ZA13 Mart, Cum | Z**** A****  Ürün paketleme güzeldi ürün zarar görmemişti, parçaları tam geldi, ürün hızlı elime ulaştı. Oğlum kullanıyor çok memnun kaldı. Satıcı firmanın ilgisinden çok memnun kaldık, ürün tesliminden sonra telefonla ulaşıp bilgi aldılar kendilerine teşekkür ederiz 😊Kullanıcı bu ürünü Yonka Müzik Market A.Ş satıcısından aldı.RenkMat SiyahBu değerlendirme faydalı mı?00Teşekkür Ederiz.Bildir'
+Div Class=['hermes-ReviewCard-module-d8jkIeahEht8S_8pEvs2'], Style=None: 'ZA13 Mart, Cum | Z**** A****'
+Div Class=['hermes-ReviewCard-module-A7POv1Ekpwm2UnGNMxgt'], Style=background-color:#eee: 'ZA'
+Div Class=['hermes-ReviewCard-module-Cm0IfQi6_sPH1ZzgO6PB'], Style=None: ''
+Div Class=['hermes-ReviewCard-module-hzOdR4lDXM2ywH_GGov3'], Style=None: '13 Mart, Cum | Z**** A****'
+Div Class=['hermes-ReviewCard-module-SBoho2ewx9jfjIE6ywIF'], Style=None: '13 Mart, Cum | Z**** A****'
+Div Class=['hermes-RatingPointer-module-UefD0t2XvgGWsKdLkNoX'], Style=None: ''
+Div Class=['star'], Style=width:12px;height:12px: ''
+Div Class=['star'], Style=width:12px;height:12px: ''
+Div Class=['star'], Style=width:12px;height:12px: ''
+Div Class=['star'], Style=width:12px;height:12px: ''
+Div Class=['star'], Style=width:12px;height:12px: ''
+Div Class=['hermes-ReviewCard-module-ba888_vGEW2e_XKxTgdA'], Style=None: '13 Mart, Cum | Z**** A****'
+Div Class=['hermes-ReviewCard-module-p2lw9pDiloK0sQ9iHHQy'], Style=None: 'Z**** A****'
+Div Class=None, Style=None: ''
+Div Class=['hermes-ReviewCard-module-KaU17BbDowCWcTZ9zzxw'], Style=None: 'Ürün paketleme güzeldi ürün zarar görmemişti, parçaları tam geldi, ürün hızlı elime ulaştı. Oğlum kullanıyor çok memnun kaldı. Satıcı firmanın ilgisinden çok memnun kaldık, ürün tesliminden sonra telefonla ulaşıp bilgi aldılar kendilerine teşekkür ederiz 😊Kullanıcı bu ürünü Yonka Müzik Market A.Ş satıcısından aldı.RenkMat Siyah'
+Div Class=['hermes-ReviewCard-module-KmAp6RGZFgoRuElVHoHy'], Style=None: 'Kullanıcı bu ürünü Yonka Müzik Market A.Ş satıcısından aldı.RenkMat Siyah'
+Div Class=['hermes-ReviewCard-module-TspG0RoSQfjBwh_1DIaf'], Style=None: 'RenkMat Siyah'
+Div Class=['hermes-ReviewCard-module-NTaJkU5vSwVarg1jEokX'], Style=None: 'RenkMat Siyah'
+Div Class=None, Style=None: ''
+Div Class=['hermes-ReviewCard-module-_K5KClPNOmqYajjPTcHy'], Style=None: ''
+Div Class=['hermes-ReviewCard-module-PIYjivsoZ80VfkdrlGgg'], Style=None: 'Bu değerlendirme faydalı mı?00Teşekkür Ederiz.Bildir'
+Div Class=['hermes-ReviewCard-module-Kl1HEMGgBAByCK6ilhDw'], Style=None: 'Bu değerlendirme faydalı mı?00'
+Div Class=['hermes-ReviewCard-module-mMWiHRkBKV4Lw0a_9jNQ'], Style=None: '00'
+Div Class=['hermes-ReviewCard-module-TmvsHE1pbDdDHzyLW5w3'], Style=None: '0'
+Div Class=['hermes-ReviewCard-module-PbSfiSWIgfswGGBaOrw7'], Style=None: ''
+Div Class=['thumbsUp', 'hermes-ReviewCard-module-lOsa4wAwncdp3GgzpaaV'], Style=None: ''
+Div Class=['hermes-ReviewCard-module-X2QyqJuzO3qbXSWF8zHK'], Style=None: '0'
+Div Class=['hermes-ReviewCard-module-TmvsHE1pbDdDHzyLW5w3'], Style=None: '0'
+Div Class=['hermes-ReviewCard-module-PbSfiSWIgfswGGBaOrw7', 'hermes-ReviewCard-module-YHexIMZApHR8oCKoe9aY'], Style=None: ''
+Div Class=['thumbsDown', 'hermes-ReviewCard-module-hiS8vgAdxD2oeXanfvPg'], Style=None: ''
+Div Class=['hermes-ReviewCard-module-X2QyqJuzO3qbXSWF8zHK'], Style=None: '0'
+Div Class=['hermes-ReviewCard-module-W9XCUrsYbMxwcvGtu1MF'], Style=None: 'Teşekkür Ederiz.'
+Div Class=['hermes-ReviewCard-module-ruLxUj2RGQAlFAobNixn'], Style=None: 'Bildir'

@@ -1,0 +1,19 @@
+
+--- Script 2 (Length: 2321) ---
+const utagData = {"canonical_url":"https://www.hepsiburada.com/midex-plx-100bk-st-tasinabilir-dijital-piyano-tus-hassasiyetli-88-tus-bluetooth-sarjli-stand-sustain-kulaklik-canta-metod-pm-HBC00003XFG97","category_id_hierarchy":"60001501 > 2147483641 > 80530127 > 402326 > 405066","category_name_hiera
+window.utagData = utagData;
+Object.assign(window.dataLayer, utagData);
+
+--- Script 7 (Length: 515) ---
+
+--- Script 8 (Length: 663) ---
+
+--- Script 9 (Length: 5756) ---
+
+--- Script 10 (Length: 303763) ---
+{"accountState":{"userInfo":{"cartCount":0},"areAdultImagesVisible":false},"productState":{"product":{"brand":"Midex","brandId":"midex","sku":"HBCV00003XFG98","productId":"HBC00003XFG97","barcode":"8684173016048","name":"PLX-100BK-ST Taşınabilir Dijital Piyano Tuş Hassasiyetli 88 Tuş Bluetooth Şarjl
+
+--- Script 15 (Length: 3705) ---
+
+--- Script 17 (Length: 935) ---
+(function(){let e;window.pwa=!0,e=setInterval(function(){const t=window.hepsiBus,a=window.performance.timing;if(t&&a&&a.loadEventEnd>0&&a.domContentLoadedEventEnd>0){var n,l,r,i;const o=(a.domContentLoadedEventEnd-a.navigationStart)/1e3,s=(a.loadEventEnd-a.navigationStart)/1e3;window.additionalIniti
