@@ -200,12 +200,12 @@ function App() {
                                         <h3>Gerçek Güven Skoru</h3>
                                         <div className="score-display">
                                             <span className={`score-value ${analysisResult.true_trust_score < 3.0 ? 'danger' : 'safe'}`}>
-                                                {analysisResult.true_trust_score}
+                                                {Number(analysisResult.true_trust_score).toFixed(1)}
                                             </span>
                                             <span className="score-max">/ 5.0</span>
                                         </div>
                                         <div className="bot-percentage">
-                                            Toplam {analysisResult.total_reviews} yazılı yorum incelendi. İhlal oranı: %{analysisResult.bot_percentage}
+                                            Toplam {analysisResult.total_reviews} yorum arasından son {analysisResult.analyzed_reviews_count || Math.min(250, analysisResult.total_reviews)} tanesi incelendi. İhlal oranı: %{analysisResult.bot_percentage}
                                         </div>
                                     </div>
 
@@ -234,7 +234,7 @@ function App() {
                                     <div className="glass-card">
                                         <h3>E-Ticaret Sitesi Skoru</h3>
                                         <div className="score-display">
-                                            <span className="score-value safe">{analysisResult.platform_score}</span>
+                                            <span className="score-value safe">{Number(analysisResult.platform_score).toFixed(1)}</span>
                                             <span className="score-max">/ 5.0</span>
                                         </div>
                                         <p style={{ color: 'var(--text-muted)', marginTop: '1rem', fontSize: '0.9rem' }}>

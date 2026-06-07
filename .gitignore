@@ -83,3 +83,21 @@ docker-compose.override.yml
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# ===========================
+# Proje Geliştirme Scratch Dosyaları
+# ===========================
+# Kök dizindeki geçici test/debug/dump scriptleri ve HTML dosyaları
+/inspect_*.py
+/dump_*.py
+/search_*.py
+/find_*.py
+/parse_*.py
+/simulate_*.py
+/check_*.py
+/crawled_*.json
+/*.html
+/*.txt
+/state_output.txt
+/page4_debug.png
+/test_backend_api.py

@@ -18,7 +18,7 @@
         let debug_source = '';
 
         const isReviewPhoto = (img) => {
-            const src = img.src || img.dataset?.src || '';
+            const src = img.dataset?.original || img.getAttribute('data-original') || img.dataset?.src || img.src || '';
             if (!src || src.startsWith('data:')) return false;
             
             const lowerSrc = src.toLowerCase();
@@ -29,7 +29,8 @@
             } else if (isTrendyol) {
                 if (!(lowerSrc.includes('dsmcdn.com') || lowerSrc.includes('ty-images.com') || lowerSrc.includes('review-images') || lowerSrc.includes('usercontents'))) return false;
             } else if (isN11) {
-                if (!(lowerSrc.includes('n11scdn') || lowerSrc.includes('akamaized.net') || lowerSrc.includes('n11images.com') || lowerSrc.includes('review-images') || lowerSrc.includes('usercontents'))) return false;
+                // N11 için strict domain kontrolü yapmıyoruz, çünkü farklı CDN'ler veya lazy load image tagleri kullanılabiliyor.
+                // Sadece blacklist/boyut kontrolü yapılacak.
             }
             
             // Küçük ikonları, yıldızları, avatarları ve kullanıcı arayüzü elemanlarını kesinlikle dışla
@@ -123,7 +124,7 @@
                     const imgs = [];
                     el.querySelectorAll('img').forEach(img => {
                         if (isReviewPhoto(img)) {
-                            const src = img.src || img.dataset?.src;
+                            const src = img.dataset?.original || img.getAttribute('data-original') || img.dataset?.src || img.src;
                             if (src && !imgs.includes(src)) imgs.push(src);
                         }
                     });
@@ -217,7 +218,7 @@
                         const imgs = [];
                         el.querySelectorAll('img').forEach(img => {
                             if (isReviewPhoto(img)) {
-                                const src = img.src || img.dataset?.src;
+                                const src = img.dataset?.original || img.getAttribute('data-original') || img.dataset?.src || img.src;
                                 if (src && !imgs.includes(src)) {
                                     imgs.push(src);
                                 }
@@ -519,7 +520,7 @@
                 let hasPhoto = h64Count > 0 || w80Count > 0;
                 if (!hasPhoto) {
                     card.querySelectorAll('img').forEach(img => {
-                        const src = img.src || img.dataset?.src || '';
+                        const src = img.src || img.dataset?.src || img.dataset?.original || img.getAttribute('data-original') || '';
                         if (src.includes('usercontents') || src.includes('review-images')) hasPhoto = true;
                     });
                 }
@@ -570,7 +571,7 @@
             const uniqueSrcs = new Set();
             document.querySelectorAll('[class*="review"] img, [class*="Review"] img, [class*="rvw"] img, [class*="comment"] img, [class*="Comment"] img').forEach(img => {
                 if (isReviewPhoto(img)) {
-                    const src = img.src || '';
+                    const src = img.dataset?.original || img.getAttribute('data-original') || img.dataset?.src || img.src || '';
                     if (src) uniqueSrcs.add(src);
                 }
             });
@@ -595,8 +596,18 @@
 
         // ========== SONUÇ ==========
         if (!debug_source) debug_source = 'BULUNAMADI';
+        // Ürün Adını Temizle
+        let pTitle = document.title;
+        const h1 = document.querySelector('h1');
+        if (h1 && h1.innerText.trim().length > 0) {
+            pTitle = h1.innerText.trim();
+        } else {
+            pTitle = pTitle.split(' - ')[0].replace('Fiyatları ve Özellikleri', '').trim();
+        }
+
         const result = {
             extracted_data: {
+                product_title: pTitle,
                 score: score || 0,
                 total_ratings: ratingsCount || 0,
                 total_reviews: commentCount,

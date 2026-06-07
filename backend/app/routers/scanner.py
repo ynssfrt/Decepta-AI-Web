@@ -24,6 +24,7 @@ async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer, htm
 
         # ---- VERİ KAYNAĞI SEÇİMİ ----
         detailed_reviews = []
+        product_title = "Bilinmeyen Ürün"
         if extracted_data:
             # Extension veri gönderdi - DOĞRUDAN kullan, scraper'a DÜŞME
             actual_platform_score = float(extracted_data.get("score", 0)) or 4.5
@@ -31,6 +32,7 @@ async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer, htm
             total_reviews = int(extracted_data.get("total_reviews", 0))
             real_comments = extracted_data.get("comments", [])
             detailed_reviews = extracted_data.get("detailed_reviews", [])
+            product_title = extracted_data.get("product_title", "Bilinmeyen Ürün")
                 
             logger.info(f"[EXT] Score={actual_platform_score}, Ratings={total_ratings}, Reviews={total_reviews}, Comments={len(real_comments)}")
             TASKS_DB[task_id]["current_step"] = "1/3: Extension verileri alındı..."
@@ -53,6 +55,7 @@ async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer, htm
             actual_platform_score = scraper.extract_score()
             total_ratings, total_reviews = scraper.extract_metrics()
             real_comments = scraper.extract_real_comments()
+            product_title = getattr(scraper, 'product_title', 'Bilinmeyen Ürün')
             
             logger.info(f"[SCRAPER] Score={actual_platform_score}, Ratings={total_ratings}, Yorumlar={len(real_comments)}")
 
@@ -109,7 +112,7 @@ async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer, htm
         if detailed_reviews:
             try:
                 image_analyzer = ImageAnalyzer()
-                img_suspicious = image_analyzer.analyze_images(detailed_reviews)
+                img_suspicious = image_analyzer.analyze_images(detailed_reviews, product_title=product_title)
                 suspicious_list.extend(img_suspicious)
             except Exception as img_err:
                 logger.warning(f"Görüntü analizi başarısız (devam ediliyor): {img_err}")
@@ -129,6 +132,29 @@ async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer, htm
             
             # Detektörden gelen şüphelileri ekle
             suspicious_list.extend(detection_result["suspicious_reviews"])
+            
+            # --- NEO4J GRAPH (AĞ) ANALİZİ VE VERİ KAYDI ---
+            try:
+                from app.services.neo4j_service import Neo4jService
+                neo4j_svc = Neo4jService()
+                if neo4j_svc.enabled:
+                    authors_list = [r.get("author") for r in review_dicts if r.get("author")]
+                    network_anomalies = neo4j_svc.check_network_anomalies(authors_list)
+                    
+                    for r in review_dicts:
+                        author = r.get("author")
+                        if author in network_anomalies:
+                            for warning in network_anomalies[author]:
+                                suspicious_list.append({
+                                    "text": r.get("text", ""),
+                                    "reason": warning
+                                })
+                    
+                    # Gelecekteki taramalar için bu veriyi Neo4j'ye kaydet
+                    neo4j_svc.ingest_scan_data(url, review_dicts)
+                    neo4j_svc.close()
+            except Exception as neo_err:
+                logger.warning(f"Neo4j entegrasyon hatası: {neo_err}")
             
             # Resim ve NLP analizinden gelen şüpheleri birleştir (metin bazlı tekilleştir)
             merged_suspicious = {}
@@ -151,7 +177,17 @@ async def _run_analysis_pipeline(task_id: str, url: str, sentiment_analyzer, htm
             #  ImageAnalyzer'dan gelen ekstra bulgular dahil değildir)
             analyzed_count = max(1, len(review_dicts))
             bot_percentage = int((len(suspicious_list) / analyzed_count) * 100) if len(review_dicts) > 0 else detection_result["bot_percentage"]
-            true_trust_score = detection_result["calculated_trust_score"]
+            
+            # Güven skorunu TÜM modüllerden (NLP + Image + Neo4j) gelen güncel şüpheli listesiyle tekrar hesapla
+            suspected_bots = len(suspicious_list)
+            if suspected_bots > 0 and analyzed_count > 0:
+                organic_count = max(1, analyzed_count - suspected_bots)
+                total_points = analyzed_count * actual_platform_score
+                bot_points = suspected_bots * 5.0 # Varsayılan olarak botların şişirme (5 yıldız) yaptığı kabul edilir
+                organic_points = max(0.0, total_points - bot_points)
+                true_trust_score = round(max(1.0, min(5.0, organic_points / organic_count)), 1)
+            else:
+                true_trust_score = detection_result["calculated_trust_score"]
 
         TASKS_DB[task_id]["current_step"] = "3/3: Ağ Analizi Tamamlanıyor..."
         TASKS_DB[task_id]["progress"] = 85
